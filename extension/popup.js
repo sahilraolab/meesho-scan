@@ -210,8 +210,24 @@ function renderClaims(queue) {
   }).join('');
 }
 
-function fillClaim(claimId) {
-  const claim = currentClaims.find(c => c.claimId === claimId);
+async function fillClaim(claimId) {
+  // Always use the freshest claim data from server
+  const { token } = await new Promise(r => chrome.storage.local.get(['token'], r));
+  let claim = currentClaims.find(c => c.claimId === claimId) || null;
+
+  // If local copy missing or has no files, fetch from server
+  if (!claim || !claim.files || !Object.keys(claim.files).length) {
+    try {
+      const res = await fetch(`${SERVER}/api/claims`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const all = await res.json();
+        claim = all.find(c => c.claimId === claimId) || claim;
+      }
+    } catch { }
+  }
+
   chrome.tabs.query({ url: 'https://supplier.meesho.com/*' }, (tabs) => {
     if (!tabs.length) {
       chrome.tabs.create({ url: 'https://supplier.meesho.com/returns' });

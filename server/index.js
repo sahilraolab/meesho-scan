@@ -32,11 +32,26 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 const users = new Datastore({ filename: path.join(DATA_DIR, 'users.db'), autoload: true });
 const scans = new Datastore({ filename: path.join(DATA_DIR, 'scans.db'), autoload: true });
 
-// In-memory claim registry: claimId → email (claims auto-expire in 30 min)
-const claimRegistry = new Map();
+// ── Claim registry (persisted to disk) ───────────────────────────────────────
 
-// Full claim metadata store: claimId → { email, awb, subOrderNum, packetId, files, ts }
-const claimStore = new Map();
+const CLAIMS_FILE = path.join(DATA_DIR, 'claims.json');
+
+const claimRegistry = new Map();
+const claimStore    = new Map();
+
+// Load persisted claims on startup
+try {
+  const saved = JSON.parse(fs.readFileSync(CLAIMS_FILE, 'utf8'));
+  for (const c of saved) {
+    claimRegistry.set(c.claimId, c.email);
+    claimStore.set(c.claimId, c);
+  }
+  console.log(`[Claims] loaded ${saved.length} claims from disk`);
+} catch { /* file doesn't exist yet — fine */ }
+
+function persistClaims() {
+  fs.writeFile(CLAIMS_FILE, JSON.stringify([...claimStore.values()], null, 2), () => {});
+}
 
 // Multer: disk storage keyed by claimId set before upload runs
 const claimStorage = multer.diskStorage({
@@ -49,7 +64,6 @@ const upload = multer({
   fileFilter(_req, file, cb) {
     console.log(`[multer] field=${file.fieldname} mime=${file.mimetype} size-hint=${file.size}`);
     if (file.fieldname === 'unpacking_video') {
-      // Accept any video/* regardless of codec suffix
       const ok = /^video\//i.test(file.mimetype);
       console.log(`[multer] video accept=${ok}`);
       return cb(null, ok);
@@ -78,7 +92,6 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'mobile')));
 app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'mobile', 'index.html')));
 
-// Serve extension ZIP for download (place extension.zip next to index.js)
 app.get('/extension.zip', (req, res) => {
   const zipPath = path.join(__dirname, 'extension.zip');
   if (!fs.existsSync(zipPath)) return res.status(404).send('Extension ZIP not found.');
@@ -177,6 +190,7 @@ app.post('/api/claim', auth, assignClaimId, (req, res, next) => {
   // Register claim ownership + full metadata
   claimRegistry.set(claimId, req.user.email);
   claimStore.set(claimId, { email: req.user.email, claimId, awb, subOrderNum, packetId, files, ts: Date.now() });
+  persistClaims();
 
   // Relay to extension
   const conn = getConn(req.user.email);
@@ -188,9 +202,6 @@ app.post('/api/claim', auth, assignClaimId, (req, res, next) => {
 
   res.json({ ok: true, claimId, delivered });
   console.log(`[CLAIM] ${req.user.email}: ${awb} → delivered=${delivered}`);
-
-  // Note: Claims are now persistent on the server side
-  // Extension can access them anytime via /api/claims
 });
 
 // List all pending claims for the authenticated user
@@ -214,7 +225,9 @@ app.get('/api/claim/:claimId/:field', auth, (req, res) => {
   try {
     const match = fs.readdirSync(dir).find(f => f.startsWith(field + '.'));
     if (!match) return res.status(404).end();
-    res.sendFile(path.join(dir, match));
+    const filePath = path.resolve(dir, match);
+    console.log('[CLAIM FILE] serving:', filePath);
+    res.sendFile(filePath);
   } catch {
     res.status(404).end();
   }
@@ -258,7 +271,7 @@ wss.on('connection', (ws, req) => {
         const otherRole = role === 'mobile' ? 'extension' : 'mobile';
         const other = conn[otherRole];
         if (other?.readyState === WebSocket.OPEN) {
-          other.send(JSON.stringify({ type: 'peer_connected', role }));          // also tell the new connection that the other side is already here
+          other.send(JSON.stringify({ type: 'peer_connected', role }));
           ws.send(JSON.stringify({ type: 'peer_connected', role: otherRole }));
         }
       } catch {
