@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#f43397" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Meesho Scan" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon192.png" />
+  <title>Meesho Scan</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --pink: #f43397;
+      --pink-dark: #d41f7a;
+      --bg: #fafafa;
+      --card: #ffffff;
+      --text: #1a1a1a;
+      --muted: #666;
+      --border: #e5e5e5;
+      --green: #16a34a;
+      --red: #dc2626;
+      --yellow: #d97706;
+      --radius: 14px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--pink);
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-logo { font-weight: 700; font-size: 18px; letter-spacing: -0.3px; }
+    .header-user { font-size: 13px; opacity: 0.9; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-logout {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    /* ── Main content ── */
+    main {
+      flex: 1;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-width: 480px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    /* ── Inputs ── */
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .field label { font-size: 13px; font-weight: 500; color: var(--muted); }
+    .field input {
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.15s;
+      background: #fff;
+      width: 100%;
+    }
+    .field input:focus { border-color: var(--pink); }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; pointer-events: none; }
+    .btn-primary { background: var(--pink); color: #fff; }
+    .btn-secondary { background: #f0f0f0; color: var(--text); }
+    .btn-danger { background: var(--red); color: #fff; }
+
+    .btn-row { display: flex; gap: 10px; }
+    .btn-row .btn { flex: 1; }
+
+    /* ── Toggle link ── */
+    .toggle-link {
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+    .toggle-link span { color: var(--pink); cursor: pointer; font-weight: 600; }
+
+    /* ── Connection status ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .status-bar.connected    { background: #dcfce7; color: var(--green); }
+    .status-bar.disconnected { background: #fee2e2; color: var(--red); }
+    .status-bar.warning      { background: #fef3c7; color: var(--yellow); }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-bar.connected    .status-dot { background: var(--green); }
+    .status-bar.disconnected .status-dot { background: var(--red); }
+    .status-bar.warning      .status-dot { background: var(--yellow); }
+
+    /* ── Scanner ── */
+    .scanner-wrap {
+      position: relative;
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      aspect-ratio: 1;
+    }
+    #scanVideo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .scan-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .scan-frame {
+      width: 65%;
+      aspect-ratio: 1;
+      border: 2.5px solid var(--pink);
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
+      position: relative;
+    }
+    .scan-frame::before, .scan-frame::after,
+    .scan-frame-inner::before, .scan-frame-inner::after {
+      content: '';
+      position: absolute;
+      width: 20px; height: 20px;
+      border-color: #fff;
+      border-style: solid;
+    }
+    .scan-frame::before  { top: -2px; left: -2px;  border-width: 3px 0 0 3px; border-radius: 6px 0 0 0; }
+    .scan-frame::after   { top: -2px; right: -2px; border-width: 3px 3px 0 0; border-radius: 0 6px 0 0; }
+    .scan-frame-inner::before  { bottom: -2px; left: -2px;  border-width: 0 0 3px 3px; border-radius: 0 0 0 6px; }
+    .scan-frame-inner::after   { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-radius: 0 0 6px 0; }
+
+    .scan-line {
+      position: absolute;
+      left: 4px; right: 4px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--pink), transparent);
+      animation: scan-move 2s linear infinite;
+    }
+    @keyframes scan-move {
+      0%   { top: 8%; }
+      50%  { top: 88%; }
+      100% { top: 8%; }
+    }
+
+    .scanner-hint {
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    /* ── Last scan result ── */
+    .last-scan {
+      background: #f0fdf4;
+      border: 1.5px solid #86efac;
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .last-scan-icon { font-size: 22px; }
+    .last-scan-awb  { font-size: 16px; font-weight: 700; color: var(--green); letter-spacing: 0.5px; }
+    .last-scan-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .delivered-badge {
+      margin-left: auto;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .delivered-badge.ok  { background: #dcfce7; color: var(--green); }
+    .delivered-badge.pending { background: #fef3c7; color: var(--yellow); }
+
+    /* ── Scan history ── */
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #fafafa;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .history-awb  { font-weight: 600; font-size: 14px; }
+    .history-time { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .history-status {
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .history-status.delivered { background: #dcfce7; color: var(--green); }
+    .history-status.scanned   { background: #fef3c7; color: var(--yellow); }
+
+    .empty-state {
+      text-align: center;
+      padding: 24px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #333;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 24px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: transform 0.25s ease;
+      z-index: 9999;
+      white-space: nowrap;
+      max-width: 90vw;
+      text-align: center;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.success { background: var(--green); }
+    #toast.error   { background: var(--red); }
+
+    /* ── Views ── */
+    .view { display: none; flex-direction: column; }
+    .view.active { display: flex; }
+
+    /* ── Error text ── */
+    .err-text { color: var(--red); font-size: 13px; margin-top: 8px; text-align: center; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2.5px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Manual input ── */
+    .manual-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .manual-row input {
+      flex: 1;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 15px;
+      outline: none;
+      background: #fff;
+    }
+    .manual-row input:focus { border-color: var(--pink); }
+    .manual-row .btn { width: auto; padding: 12px 18px; }
+
+    /* ── Tab bar ── */
+    #tabBar {
+      display: none;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 53px;
+      z-index: 99;
+    }
+    .tabs {
+      display: flex;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 12px 0;
+      background: none;
+      border: none;
+      border-bottom: 2.5px solid transparent;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab-btn.active { color: var(--pink); border-bottom-color: var(--pink); }
+
+    /* ── Claim scan target pills ── */
+    .scan-target-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .target-label { font-size: 12px; color: var(--muted); font-weight: 500; flex-shrink: 0; }
+    .target-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+    .target-pill {
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .target-pill.active { border-color: var(--pink); background: var(--pink); color: #fff; }
+    .target-pill.done   { border-color: var(--green); color: var(--green); background: #f0fdf4; }
+
+    /* ── Claim text fields ── */
+    .claim-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .claim-field  { display: flex; flex-direction: column; gap: 4px; }
+    .claim-field label {
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .claim-field-input {
+      display: flex; align-items: center; gap: 6px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      padding: 10px 12px; background: #fff; transition: border-color 0.15s;
+    }
+    .claim-field-input.filled { border-color: var(--green); background: #f0fdf4; }
+    .claim-field-input input {
+      flex: 1; border: none; outline: none;
+      font-size: 14px; font-weight: 500; background: transparent; color: var(--text);
+    }
+    .claim-check { color: var(--green); font-size: 16px; flex-shrink: 0; }
+
+    /* ── Media items ── */
+    .media-list { display: flex; flex-direction: column; gap: 10px; }
+    .media-item {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 12px 14px;
+      background: #fafafa; border: 1.5px solid var(--border); border-radius: 10px;
+      transition: border-color 0.15s;
+    }
+    .media-item.captured { border-color: var(--green); background: #f0fdf4; }
+    .media-item-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+    .media-emoji { font-size: 20px; flex-shrink: 0; }
+    .media-info  { min-width: 0; }
+    .media-name  { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .media-hint  { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .media-thumb {
+      width: 36px; height: 36px; border-radius: 6px;
+      object-fit: cover; border: 1px solid var(--border);
+      display: none; flex-shrink: 0;
+    }
+    .media-thumb.show { display: block; }
+    .media-btn {
+      padding: 7px 14px; border: 1.5px solid var(--pink);
+      border-radius: 8px; background: #fff; color: var(--pink);
+      font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .media-btn:hover { background: var(--pink); color: #fff; }
+    .req-star { color: var(--red); }
+
+    /* ── Camera capture overlay ── */
+    #captureOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden;
+    }
+    .capture-video-wrap {
+      flex: 1;
+      min-height: 0;       /* prevent video from overflowing flex container */
+      width: 100%;
+      max-width: 720px;    /* cap on wide desktop screens */
+      overflow: hidden;
+      position: relative;
+      background: #111;
+    }
+    #capturePreviewVideo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .capture-bar {
+      background: #111;
+      border-top: 1px solid #2a2a2a;
+      padding: 14px 28px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      width: 100%;
+      max-width: 720px;
+      gap: 12px;
+    }
+    .capture-cancel {
+      color: #fff;
+      background: rgba(255,255,255,0.12);
+      border: 1.5px solid rgba(255,255,255,0.2);
+      font-size: 16px;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .capture-cancel:hover { background: rgba(255,255,255,0.22); }
+    .capture-shutter {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: #fff;
+      border: 5px solid rgba(255,255,255,0.35);
+      cursor: pointer;
+      transition: transform 0.1s, background 0.2s;
+      flex-shrink: 0;
+    }
+    .capture-shutter:hover  { background: #e5e5e5; }
+    .capture-shutter:active { transform: scale(0.92); }
+    .capture-shutter.recording { background: var(--red); border-color: rgba(220,38,38,0.3); }
+    .capture-meta {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+      min-width: 72px;
+    }
+    .capture-label-badge {
+      color: #fff; font-size: 11px; font-weight: 700;
+      background: rgba(255,255,255,0.15);
+      padding: 4px 10px; border-radius: 20px;
+      letter-spacing: 0.3px; white-space: nowrap;
+    }
+    .capture-timer {
+      color: var(--red); font-size: 13px; font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body>
+
+<header id="appHeader" style="display:none">
+  <span class="header-logo">📦 Meesho Scan</span>
+  <span class="header-user" id="headerEmail"></span>
+  <button class="btn-logout" onclick="logout()">Logout</button>
+</header>
+
+<div id="tabBar" style="display:none">
+  <div class="tabs">
+    <button class="tab-btn active" id="tabScan"  onclick="switchTab('scan')">📦 Scan</button>
+    <button class="tab-btn"        id="tabClaim" onclick="switchTab('claim')">🎫 Claim</button>
+  </div>
+</div>
+
+<main>
+
+  <!-- ── Auth view ──────────────────────────────────────────── -->
+  <div id="viewAuth" class="view active">
+    <div class="card" style="margin-top: 24px;">
+      <div class="card-title" id="authTitle">Sign in to Meesho Scan</div>
+
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password" />
+      </div>
+
+      <button class="btn btn-primary" id="authBtn" onclick="submitAuth()">Sign In</button>
+      <div id="authErr" class="err-text"></div>
+      <div class="toggle-link">
+        <span id="authToggle" onclick="toggleAuthMode()">Don't have an account? Sign up</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Scanner view ───────────────────────────────────────── -->
+  <div id="viewScan" class="view">
+
+    <div id="wsStatusBar" class="status-bar disconnected">
+      <span class="status-dot"></span>
+      <span id="wsStatusText">Connecting to server…</span>
+    </div>
+
+    <div id="extStatusBar" class="status-bar warning">
+      <span class="status-dot"></span>
+      <span id="extStatusText">Chrome extension not ready</span>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Scan Barcode</div>
+      <div class="scanner-wrap">
+        <video id="scanVideo" autoplay playsinline muted></video>
+        <div class="scan-overlay">
+          <div class="scan-frame">
+            <div class="scan-frame-inner"></div>
+            <div class="scan-line"></div>
+          </div>
+        </div>
+      </div>
+      <p class="scanner-hint">Hold barcode steady inside the frame</p>
+
+      <div class="manual-row">
+        <input type="text" id="manualAWB" placeholder="Or type AWB manually…" />
+        <button class="btn btn-secondary" style="width:auto;padding:12px 18px;" onclick="sendManual()">Send</button>
+      </div>
+    </div>
+
+    <div id="lastScanWrap" style="display:none">
+      <div class="last-scan">
+        <span class="last-scan-icon">✅</span>
+        <div>
+          <div class="last-scan-awb" id="lastScanAWB"></div>
+          <div class="last-scan-meta" id="lastScanMeta"></div>
+        </div>
+        <span class="delivered-badge" id="lastScanBadge"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Scan History</div>
+      <div class="history-list" id="historyList">
+        <div class="empty-state">No scans yet</div>
+      </div>
+      <button class="btn btn-secondary" style="margin-top:12px;" onclick="clearHistory()">Clear History</button>
+    </div>
+
+  </div>
+
+  <!-- ── Claim view ──────────────────────────────────────────── -->
+  <div id="viewClaim" class="view">
+
+    <div id="claimWsStatusBar" class="status-bar disconnected">
+      <span class="status-dot"></span>
+      <span id="claimWsStatusText">Connecting to server…</span>
+    </div>
+    <div id="claimExtStatusBar" class="status-bar warning">
+      <span class="status-dot"></span>
+      <span id="claimExtStatusText">Chrome extension not ready</span>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Scan Barcodes</div>
+
+      <div class="scan-target-row">
+        <span class="target-label">Filling:</span>
+        <div class="target-pills">
+          <button class="target-pill active" id="pill-awb"      onclick="selectClaimTarget('awb')">AWB</button>
+          <button class="target-pill"        id="pill-suborder" onclick="selectClaimTarget('suborder')">Sub Order</button>
+          <button class="target-pill"        id="pill-packet"   onclick="selectClaimTarget('packet')">Packet ID</button>
+        </div>
+      </div>
+
+      <div class="scanner-wrap">
+        <video id="claimVideo" autoplay playsinline muted></video>
+        <div class="scan-overlay">
+          <div class="scan-frame">
+            <div class="scan-frame-inner"></div>
+            <div class="scan-line"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="claim-fields">
+        <div class="claim-field">
+          <label>AWB Number <span class="req-star">*</span></label>
+          <div class="claim-field-input" id="fi-awb">
+            <input type="text" id="cf-awb" placeholder="Scan or type…" oninput="onClaimFieldInput('awb')" />
+            <span class="claim-check" id="ck-awb" style="display:none">✓</span>
+          </div>
+        </div>
+        <div class="claim-field">
+          <label>Sub Order Number</label>
+          <div class="claim-field-input" id="fi-suborder">
+            <input type="text" id="cf-suborder" placeholder="Scan or type…" oninput="onClaimFieldInput('suborder')" />
+            <span class="claim-check" id="ck-suborder" style="display:none">✓</span>
+          </div>
+        </div>
+        <div class="claim-field">
+          <label>Packet ID</label>
+          <div class="claim-field-input" id="fi-packet">
+            <input type="text" id="cf-packet" placeholder="Scan or type…" oninput="onClaimFieldInput('packet')" />
+            <span class="claim-check" id="ck-packet" style="display:none">✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Capture Media</div>
+      <div class="media-list">
+
+        <div class="media-item" id="mi-barcode_image">
+          <div class="media-item-left">
+            <span class="media-emoji">🔖</span>
+            <div class="media-info">
+              <div class="media-name">Barcode Image <span class="req-star">*</span></div>
+              <div class="media-hint" id="mh-barcode_image">Photo of the barcode label</div>
+            </div>
+          </div>
+          <img class="media-thumb" id="mt-barcode_image" alt="" />
+          <button class="media-btn" onclick="triggerMedia('barcode_image')">📷 Capture</button>
+        </div>
+
+        <div class="media-item" id="mi-product_image">
+          <div class="media-item-left">
+            <span class="media-emoji">📦</span>
+            <div class="media-info">
+              <div class="media-name">Product Image <span class="req-star">*</span></div>
+              <div class="media-hint" id="mh-product_image">Photo of the received product</div>
+            </div>
+          </div>
+          <img class="media-thumb" id="mt-product_image" alt="" />
+          <button class="media-btn" onclick="triggerMedia('product_image')">📷 Capture</button>
+        </div>
+
+        <div class="media-item" id="mi-reverse_waybill">
+          <div class="media-item-left">
+            <span class="media-emoji">📄</span>
+            <div class="media-info">
+              <div class="media-name">Reverse Waybill <span class="req-star">*</span></div>
+              <div class="media-hint" id="mh-reverse_waybill">Photo of the waybill document</div>
+            </div>
+          </div>
+          <img class="media-thumb" id="mt-reverse_waybill" alt="" />
+          <button class="media-btn" onclick="triggerMedia('reverse_waybill')">📷 Capture</button>
+        </div>
+
+        <div class="media-item" id="mi-unpacking_video">
+          <div class="media-item-left">
+            <span class="media-emoji">🎬</span>
+            <div class="media-info">
+              <div class="media-name">Unpacking Video</div>
+              <div class="media-hint" id="mh-unpacking_video">Tap record, tap again to stop</div>
+            </div>
+          </div>
+          <button class="media-btn" id="videoRecordBtn" onclick="triggerMedia('unpacking_video')">🎥 Record</button>
+        </div>
+
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="claimSendBtn" onclick="sendClaim()">Send Claim to Extension</button>
+    <div class="err-text" id="claimErr"></div>
+    <div id="claimAck" style="display:none" class="last-scan">
+      <span class="last-scan-icon">✅</span>
+      <div>
+        <div class="last-scan-awb" id="claimAckAWB"></div>
+        <div class="last-scan-meta" id="claimAckMeta"></div>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<!-- ── Camera capture overlay ── -->
+<div id="captureOverlay" style="display:none">
+  <div class="capture-video-wrap">
+    <video id="capturePreviewVideo" autoplay playsinline muted></video>
+  </div>
+  <div class="capture-bar">
+    <button class="capture-cancel" onclick="closeCaptureOverlay()">✕</button>
+    <button class="capture-shutter" id="captureShutterBtn" onclick="captureShutter()"></button>
+    <div class="capture-meta">
+      <span class="capture-label-badge" id="captureLabelBadge">Photo</span>
+      <span class="capture-timer" id="captureTimerEl" style="display:none">00:00</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+
+const SERVER_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+const HISTORY_KEY = 'meesho_scan_history';
+const AUTH_KEY    = 'meesho_scan_auth';
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+let ws         = null;
+let wsReady    = false;
+let authMode   = 'login'; // 'login' | 'register'
+let token      = null;
+let userEmail  = null;
+let scanStream = null;
+let detector   = null;
+let scanLoop   = null;
+let cooldown   = false;
+let extConnected = false;
+
+let claimStream   = null;
+let claimDetector = null;
+let claimLoop     = null;
+let claimCooldown = false;
+let claimTarget   = 'awb';
+let claimFiles    = {};
+
+const CLAIM_TARGETS = ['awb', 'suborder', 'packet'];
+const IMAGE_LIMIT   = 5  * 1024 * 1024;
+const VIDEO_LIMIT   = 25 * 1024 * 1024;
+
+// ── Auth helpers ──────────────────────────────────────────────────────────────
+
+function loadAuth() {
+  try { return JSON.parse(localStorage.getItem(AUTH_KEY)); } catch { return null; }
+}
+function saveAuth(t, e) {
+  localStorage.setItem(AUTH_KEY, JSON.stringify({ token: t, email: e }));
+}
+function clearAuth() {
+  localStorage.removeItem(AUTH_KEY);
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+let toastTimer = null;
+function showToast(msg, type = '', duration = 2800) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, duration);
+}
+
+// ── View helpers ──────────────────────────────────────────────────────────────
+
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function toggleAuthMode() {
+  authMode = authMode === 'login' ? 'register' : 'login';
+  document.getElementById('authTitle').textContent =
+    authMode === 'login' ? 'Sign in to Meesho Scan' : 'Create an account';
+  document.getElementById('authBtn').textContent =
+    authMode === 'login' ? 'Sign In' : 'Sign Up';
+  document.getElementById('authToggle').textContent =
+    authMode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in';
+  document.getElementById('authErr').textContent = '';
+}
+
+// ── Auth flow ─────────────────────────────────────────────────────────────────
+
+async function submitAuth() {
+  const email    = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const errEl    = document.getElementById('authErr');
+  errEl.textContent = '';
+
+  if (!email || !password) { errEl.textContent = 'Email and password are required.'; return; }
+
+  const btn = document.getElementById('authBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    const endpoint = authMode === 'login' ? '/auth/login' : '/auth/register';
+    const res  = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed.');
+
+    token     = data.token;
+    userEmail = data.email;
+    saveAuth(token, userEmail);
+    enterApp();
+  } catch (err) {
+    errEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = authMode === 'login' ? 'Sign In' : 'Sign Up';
+  }
+}
+
+function logout() {
+  stopCamera();
+  stopClaimCamera();
+  ws?.close();
+  clearAuth();
+  token = null; userEmail = null; wsReady = false;
+  claimFiles = {};
+  document.getElementById('appHeader').style.display = 'none';
+  document.getElementById('tabBar').style.display = 'none';
+  showView('viewAuth');
+}
+
+// ── Enter app after auth ──────────────────────────────────────────────────────
+
+function enterApp() {
+  document.getElementById('appHeader').style.display = 'flex';
+  document.getElementById('headerEmail').textContent = userEmail;
+  document.getElementById('tabBar').style.display = 'block';
+  showView('viewScan');
+  connectWS();
+  startCamera();
+  renderHistory();
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+
+function setWSStatus(connected, label) {
+  for (const [barId, txtId] of [['wsStatusBar','wsStatusText'],['claimWsStatusBar','claimWsStatusText']]) {
+    const bar = document.getElementById(barId);
+    const txt = document.getElementById(txtId);
+    if (bar) bar.className = `status-bar ${connected ? 'connected' : 'disconnected'}`;
+    if (txt) txt.textContent = label;
+  }
+}
+
+function setExtStatus(connected) {
+  extConnected = connected;
+  const label = connected ? 'Chrome extension: ready' : 'Chrome extension not ready — open Meesho Returns in Chrome';
+  for (const [barId, txtId] of [['extStatusBar','extStatusText'],['claimExtStatusBar','claimExtStatusText']]) {
+    const bar = document.getElementById(barId);
+    const txt = document.getElementById(txtId);
+    if (bar) bar.className = `status-bar ${connected ? 'connected' : 'warning'}`;
+    if (txt) txt.textContent = label;
+  }
+}
+
+let wsReconnectTimer = null;
+
+function connectWS() {
+  clearTimeout(wsReconnectTimer);
+  if (ws) { try { ws.close(); } catch {} }
+
+  setWSStatus(false, 'Connecting…');
+  ws = new WebSocket(SERVER_URL);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'auth', token, role: 'mobile' }));
+  };
+
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+
+    switch (msg.type) {
+      case 'auth_ok':
+        wsReady = true;
+        setWSStatus(true, `Connected (${msg.email})`);
+        break;
+      case 'auth_error':
+        setWSStatus(false, 'Auth failed — please logout and re-login');
+        break;
+      case 'peer_connected':
+        if (msg.role === 'extension') setExtStatus(true);
+        break;
+      case 'peer_disconnected':
+        if (msg.role === 'extension') setExtStatus(false);
+        break;
+      case 'session_replaced':
+        setWSStatus(false, 'Session replaced by another device');
+        break;
+      case 'scan_ack':
+        handleScanAck(msg);
+        break;
+    }
+  };
+
+  ws.onclose = () => {
+    wsReady = false;
+    setWSStatus(false, 'Disconnected — reconnecting…');
+    setExtStatus(false);
+    wsReconnectTimer = setTimeout(connectWS, 3000);
+  };
+
+  ws.onerror = () => {
+    wsReady = false;
+    setWSStatus(false, 'Connection error');
+  };
+}
+
+// ── Camera & BarcodeDetector ──────────────────────────────────────────────────
+
+async function getCameraStream() {
+  const attempts = [
+    { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } },
+    { video: { width: { ideal: 1280 }, height: { ideal: 720 } } },
+    { video: true },
+  ];
+  for (const c of attempts) {
+    try { return await navigator.mediaDevices.getUserMedia({ ...c, audio: false }); } catch {}
+  }
+  return null;
+}
+
+async function startCamera() {
+  scanStream = await getCameraStream();
+  if (!scanStream) { showToast('Camera access denied. Use manual input.', 'error', 4000); return; }
+  const video = document.getElementById('scanVideo');
+  video.srcObject = scanStream;
+  await video.play();
+  initDetector();
+}
+
+function stopCamera() {
+  if (scanLoop) cancelAnimationFrame(scanLoop);
+  scanLoop = null;
+  if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+}
+
+function initDetector() {
+  if ('BarcodeDetector' in window) {
+    detector = new BarcodeDetector({ formats: [
+      'code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'data_matrix', 'itf', 'upc_a', 'upc_e',
+    ]});
+    requestAnimationFrame(detectLoop);
+  } else {
+    // Fallback: show manual input hint
+    document.querySelector('.scanner-hint').textContent =
+      'BarcodeDetector not available — use manual input below';
+  }
+}
+
+async function detectLoop() {
+  if (!scanStream) return;
+  const video = document.getElementById('scanVideo');
+  if (video.readyState >= 2 && detector && !cooldown) {
+    try {
+      const barcodes = await detector.detect(video);
+      if (barcodes.length > 0) {
+        const awb = barcodes[0].rawValue.trim().toUpperCase();
+        sendScan(awb);
+      }
+    } catch {}
+  }
+  scanLoop = requestAnimationFrame(detectLoop);
+}
+
+// ── Sending scans ─────────────────────────────────────────────────────────────
+
+function sendScan(awb) {
+  if (!awb || cooldown) return;
+  cooldown = true;
+  setTimeout(() => { cooldown = false; }, 2500);
+
+  if (ws && wsReady) {
+    ws.send(JSON.stringify({ type: 'scan', awb }));
+  } else {
+    // Queue locally and show toast
+    saveToHistory({ awb, ts: Date.now(), status: 'pending' });
+    renderHistory();
+    showToast(`Scanned: ${awb} (offline)`, 'error');
+  }
+}
+
+function sendManual() {
+  const input = document.getElementById('manualAWB');
+  const awb = input.value.trim().toUpperCase();
+  if (!awb) return;
+  sendScan(awb);
+  input.value = '';
+}
+
+document.getElementById('manualAWB')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendManual();
+});
+
+function handleScanAck(msg) {
+  const { awb, delivered, ts } = msg;
+  saveToHistory({ awb, ts, status: delivered ? 'delivered' : 'scanned' });
+  renderHistory();
+
+  // Update last-scan display
+  document.getElementById('lastScanWrap').style.display = 'block';
+  document.getElementById('lastScanAWB').textContent = awb;
+  document.getElementById('lastScanMeta').textContent = formatTime(ts);
+
+  const badge = document.getElementById('lastScanBadge');
+  if (delivered) {
+    badge.textContent = 'Sent to Extension';
+    badge.className = 'delivered-badge ok';
+    showToast(`${awb} → Extension`, 'success');
+  } else {
+    badge.textContent = 'Extension offline';
+    badge.className = 'delivered-badge pending';
+    showToast(`${awb} saved — extension not connected`, 'error');
+  }
+}
+
+// ── Local history ─────────────────────────────────────────────────────────────
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { return []; }
+}
+
+function saveToHistory(entry) {
+  const history = loadHistory();
+  history.unshift(entry);
+  if (history.length > 500) history.splice(500);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
+function clearHistory() {
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+  document.getElementById('lastScanWrap').style.display = 'none';
+  showToast('History cleared');
+}
+
+function formatTime(ts) {
+  return new Date(ts).toLocaleString(undefined, {
+    month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  const history = loadHistory();
+  if (history.length === 0) {
+    list.innerHTML = '<div class="empty-state">No scans yet</div>';
+    return;
+  }
+  list.innerHTML = history.slice(0, 50).map(h => `
+    <div class="history-item">
+      <div>
+        <div class="history-awb">${h.awb}</div>
+        <div class="history-time">${formatTime(h.ts)}</div>
+      </div>
+      <span class="history-status ${h.status === 'delivered' ? 'delivered' : 'scanned'}">
+        ${h.status === 'delivered' ? 'Delivered' : 'Scanned'}
+      </span>
+    </div>
+  `).join('');
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+
+function switchTab(tab) {
+  document.getElementById('tabScan').classList.toggle('active',  tab === 'scan');
+  document.getElementById('tabClaim').classList.toggle('active', tab === 'claim');
+
+  if (tab === 'scan') {
+    showView('viewScan');
+    stopClaimCamera();
+    startCamera();
+  } else {
+    showView('viewClaim');
+    stopCamera();
+    startClaimCamera();
+  }
+}
+
+// ── Claim camera ──────────────────────────────────────────────────────────────
+
+async function startClaimCamera() {
+  claimStream = await getCameraStream();
+  if (!claimStream) { showToast('Camera access denied.', 'error', 4000); return; }
+  const video = document.getElementById('claimVideo');
+  video.srcObject = claimStream;
+  await video.play();
+  initClaimDetector();
+}
+
+function stopClaimCamera() {
+  if (claimLoop) { cancelAnimationFrame(claimLoop); claimLoop = null; }
+  if (claimStream) { claimStream.getTracks().forEach(t => t.stop()); claimStream = null; }
+  claimDetector = null;
+}
+
+function initClaimDetector() {
+  if (!('BarcodeDetector' in window)) return;
+  claimDetector = new BarcodeDetector({ formats: [
+    'code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'data_matrix', 'itf', 'upc_a', 'upc_e',
+  ]});
+  requestAnimationFrame(claimDetectLoop);
+}
+
+async function claimDetectLoop() {
+  if (!claimStream) return;
+  const video = document.getElementById('claimVideo');
+  if (video.readyState >= 2 && claimDetector && !claimCooldown) {
+    try {
+      const barcodes = await claimDetector.detect(video);
+      if (barcodes.length > 0) {
+        const val = barcodes[0].rawValue.trim().toUpperCase();
+        setClaimField(claimTarget, val);
+        claimCooldown = true;
+        setTimeout(() => { claimCooldown = false; }, 2000);
+      }
+    } catch {}
+  }
+  claimLoop = requestAnimationFrame(claimDetectLoop);
+}
+
+// ── Claim field management ────────────────────────────────────────────────────
+
+function selectClaimTarget(target) {
+  claimTarget = target;
+  CLAIM_TARGETS.forEach(t => {
+    const pill   = document.getElementById(`pill-${t}`);
+    const filled = !!document.getElementById(`cf-${t}`)?.value;
+    if (!pill) return;
+    pill.classList.toggle('active', t === target);
+    if (!filled) pill.classList.remove('done');
+  });
+}
+
+function cleanFieldValue(target, value) {
+  if (target === 'suborder') {
+    // Sub order format is {digits}_{index} — strip any trailing _XXX suffix
+    // e.g. 261724090070439424_1_QZL → 261724090070439424_1
+    const m = value.match(/^(\d+_\d+)/);
+    if (m) return m[1];
+  }
+  return value;
+}
+
+function setClaimField(target, value) {
+  const input = document.getElementById(`cf-${target}`);
+  const wrap  = document.getElementById(`fi-${target}`);
+  const check = document.getElementById(`ck-${target}`);
+  const pill  = document.getElementById(`pill-${target}`);
+  if (!input) return;
+
+  value = cleanFieldValue(target, value);
+  input.value = value;
+  if (value) {
+    wrap?.classList.add('filled');
+    if (check) check.style.display = '';
+    pill?.classList.remove('active');
+    pill?.classList.add('done');
+    const label = target === 'awb' ? 'AWB' : target === 'suborder' ? 'Sub Order' : 'Packet ID';
+    showToast(`${label}: ${value}`, 'success');
+    advanceClaimTarget();
+  } else {
+    wrap?.classList.remove('filled');
+    if (check) check.style.display = 'none';
+    pill?.classList.remove('done');
+  }
+}
+
+function advanceClaimTarget() {
+  const idx = CLAIM_TARGETS.indexOf(claimTarget);
+  for (let i = 1; i <= CLAIM_TARGETS.length; i++) {
+    const next = CLAIM_TARGETS[(idx + i) % CLAIM_TARGETS.length];
+    if (!document.getElementById(`cf-${next}`)?.value) {
+      selectClaimTarget(next);
+      return;
+    }
+  }
+  // All filled — deactivate pills
+  CLAIM_TARGETS.forEach(t => document.getElementById(`pill-${t}`)?.classList.remove('active'));
+}
+
+function onClaimFieldInput(target) {
+  const val = document.getElementById(`cf-${target}`)?.value?.trim() || '';
+  const wrap  = document.getElementById(`fi-${target}`);
+  const check = document.getElementById(`ck-${target}`);
+  const pill  = document.getElementById(`pill-${target}`);
+  if (val) {
+    wrap?.classList.add('filled');
+    if (check) check.style.display = '';
+    pill?.classList.remove('active');
+    pill?.classList.add('done');
+  } else {
+    wrap?.classList.remove('filled');
+    if (check) check.style.display = 'none';
+    pill?.classList.remove('done');
+  }
+}
+
+// ── Camera capture overlay ────────────────────────────────────────────────────
+
+let captureField   = null;
+let captureMode    = 'photo';
+let mediaRecorder  = null;
+let recordedChunks = [];
+let recordTimer    = null;
+let recordSeconds  = 0;
+
+function triggerMedia(field) {
+  if (!claimStream) { showToast('Camera not ready — open Claim tab first', 'error'); return; }
+  captureField = field;
+  captureMode  = field === 'unpacking_video' ? 'video' : 'photo';
+
+  const preview = document.getElementById('capturePreviewVideo');
+  const shutter = document.getElementById('captureShutterBtn');
+  const label   = document.getElementById('captureLabelBadge');
+  const timer   = document.getElementById('captureTimerEl');
+
+  preview.srcObject   = claimStream;
+  preview.play().catch(() => {}); // Ensure video is playing
+  label.textContent   = captureMode === 'video' ? '🎥 Tap to record' : '📷 Photo';
+  shutter.className   = 'capture-shutter';
+  timer.style.display = 'none';
+  timer.textContent   = '00:00';
+
+  document.getElementById('captureOverlay').style.display = 'flex';
+
+  // Pause barcode scanning while overlay is open
+  if (claimLoop) { cancelAnimationFrame(claimLoop); claimLoop = null; }
+}
+
+function closeCaptureOverlay() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  clearInterval(recordTimer); recordTimer = null;
+  document.getElementById('captureOverlay').style.display = 'none';
+
+  // Resume barcode scanning
+  if (claimStream && claimDetector && !claimLoop) {
+    claimLoop = requestAnimationFrame(claimDetectLoop);
+  }
+}
+
+
+function captureShutter() {
+  if (captureMode === 'photo') {
+    capturePhoto();
+  } else {
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') startVideoRecording();
+    else stopVideoRecording();
+  }
+}
+
+function capturePhoto() {
+  const preview = document.getElementById('capturePreviewVideo');
+  const canvas  = document.createElement('canvas');
+  canvas.width  = preview.videoWidth  || 1280;
+  canvas.height = preview.videoHeight || 720;
+  canvas.getContext('2d').drawImage(preview, 0, 0);
+
+  canvas.toBlob(blob => {
+    const file = new File([blob], `${captureField}_${Date.now()}.jpg`, { type: 'image/jpeg' });
+    applyCapture(captureField, file);
+    closeCaptureOverlay();
+  }, 'image/jpeg', 0.92);
+}
+
+function getSupportedVideoMime() {
+  return ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+    .find(t => MediaRecorder.isTypeSupported(t)) || '';
+}
+
+async function startVideoRecording() {
+  recordedChunks = [];
+
+  // Get a fresh stream with audio for the recording
+  let recordStream = claimStream;
+  try {
+    const attempts = [
+      { video: { facingMode: 'environment' }, audio: true },
+      { video: true, audio: true },
+      { video: true, audio: false },
+    ];
+    for (const c of attempts) {
+      try { recordStream = await navigator.mediaDevices.getUserMedia(c); break; } catch {}
+    }
+  } catch {}
+
+  const mimeType = getSupportedVideoMime();
+  try {
+    mediaRecorder = new MediaRecorder(recordStream, mimeType ? { mimeType } : {});
+  } catch { mediaRecorder = new MediaRecorder(recordStream); }
+
+  // Stop the audio-enabled stream after recording (but keep claimStream for preview)
+  const isExtraStream = recordStream !== claimStream;
+  mediaRecorder.addEventListener('stop', () => {
+    if (isExtraStream) recordStream.getTracks().forEach(t => t.stop());
+  }, { once: true });
+
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    const mime = mediaRecorder.mimeType || 'video/webm';
+    const ext  = mime.includes('mp4') ? 'mp4' : 'webm';
+    const cleanMime = mime.split(';')[0];   // 'video/mp4;codecs=avc1,opus' → 'video/mp4'
+    const blob = new Blob(recordedChunks, { type: cleanMime });
+    const file = new File([blob], `unpacking_video_${Date.now()}.${ext}`, { type: cleanMime });
+    applyCapture(captureField, file);
+    closeCaptureOverlay();
+  };
+
+  mediaRecorder.start(200);
+  document.getElementById('captureShutterBtn').classList.add('recording');
+  document.getElementById('captureTimerEl').style.display = '';
+  document.getElementById('captureLabelBadge').textContent = '⏹ Tap to stop';
+  recordSeconds = 0;
+  recordTimer = setInterval(() => {
+    recordSeconds++;
+    const m = String(Math.floor(recordSeconds / 60)).padStart(2, '0');
+    const s = String(recordSeconds % 60).padStart(2, '0');
+    document.getElementById('captureTimerEl').textContent = `${m}:${s}`;
+    if (recordSeconds >= 300) stopVideoRecording(); // auto-stop at 5 min
+  }, 1000);
+}
+
+function stopVideoRecording() {
+  clearInterval(recordTimer); recordTimer = null;
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+}
+
+function applyCapture(field, file) {
+  const isVideo = field === 'unpacking_video';
+  if (file.size > (isVideo ? VIDEO_LIMIT : IMAGE_LIMIT)) {
+    showToast(`Too large — max ${isVideo ? '25 MB' : '5 MB'}`, 'error');
+    return;
+  }
+  claimFiles[field] = file;
+
+  document.getElementById(`mi-${field}`)?.classList.add('captured');
+  const hint = document.getElementById(`mh-${field}`);
+  if (hint) hint.textContent = `${file.name} (${formatFileSize(file.size)})`;
+
+  if (!isVideo) {
+    const thumb = document.getElementById(`mt-${field}`);
+    if (thumb) { thumb.src = URL.createObjectURL(file); thumb.classList.add('show'); }
+  } else {
+    const btn = document.getElementById('videoRecordBtn');
+    if (btn) btn.textContent = '🎥 Re-record';
+  }
+
+  showToast(`${isVideo ? 'Video' : 'Photo'} saved ✓`, 'success');
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024)        return `${bytes} B`;
+  if (bytes < 1048576)     return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+// ── Send claim ────────────────────────────────────────────────────────────────
+
+async function sendClaim() {
+  const awb         = document.getElementById('cf-awb')?.value?.trim()      || '';
+  const subOrderNum = cleanFieldValue('suborder', document.getElementById('cf-suborder')?.value?.trim() || '');
+  const packetId    = document.getElementById('cf-packet')?.value?.trim()   || '';
+  const errEl       = document.getElementById('claimErr');
+  const ackEl       = document.getElementById('claimAck');
+
+  errEl.textContent = '';
+  ackEl.style.display = 'none';
+
+  if (!awb)                       { errEl.textContent = 'AWB number is required.'; return; }
+  if (!claimFiles.barcode_image)  { errEl.textContent = 'Barcode image is required.'; return; }
+  if (!claimFiles.product_image)  { errEl.textContent = 'Product image is required.'; return; }
+  if (!claimFiles.reverse_waybill){ errEl.textContent = 'Reverse waybill image is required.'; return; }
+
+  const btn = document.getElementById('claimSendBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Uploading…';
+
+  try {
+    const fd = new FormData();
+    fd.append('awb', awb);
+    if (subOrderNum) fd.append('subOrderNum', subOrderNum);
+    if (packetId)    fd.append('packetId', packetId);
+    fd.append('barcode_image',   claimFiles.barcode_image);
+    fd.append('product_image',   claimFiles.product_image);
+    fd.append('reverse_waybill', claimFiles.reverse_waybill);
+    if (claimFiles.unpacking_video) fd.append('unpacking_video', claimFiles.unpacking_video);
+
+    const res  = await fetch('/api/claim', {
+      method:  'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body:    fd,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Upload failed.');
+
+    document.getElementById('claimAckAWB').textContent  = `Claim sent: ${awb}`;
+    document.getElementById('claimAckMeta').textContent =
+      data.delivered ? 'Extension received the claim ✅' : 'Extension offline — claim queued on server';
+    ackEl.style.display = 'flex';
+
+    showToast(data.delivered ? 'Claim sent to extension' : 'Claim uploaded (extension offline)', data.delivered ? 'success' : '');
+    resetClaimForm();
+  } catch (err) {
+    errEl.textContent = err.message;
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send Claim to Extension';
+  }
+}
+
+function resetClaimForm() {
+  CLAIM_TARGETS.forEach(t => {
+    const input = document.getElementById(`cf-${t}`);
+    const wrap  = document.getElementById(`fi-${t}`);
+    const check = document.getElementById(`ck-${t}`);
+    const pill  = document.getElementById(`pill-${t}`);
+    if (input) input.value = '';
+    wrap?.classList.remove('filled');
+    if (check) check.style.display = 'none';
+    pill?.classList.remove('done', 'active');
+  });
+  document.getElementById('pill-awb')?.classList.add('active');
+  claimTarget = 'awb';
+
+  const defaultHints = {
+    barcode_image:   'Photo of the barcode label',
+    product_image:   'Photo of the received product',
+    reverse_waybill: 'Photo of the waybill document',
+    unpacking_video: 'Tap record, tap again to stop',
+  };
+  ['barcode_image', 'product_image', 'reverse_waybill', 'unpacking_video'].forEach(f => {
+    document.getElementById(`mi-${f}`)?.classList.remove('captured');
+    const hint  = document.getElementById(`mh-${f}`);
+    const thumb = document.getElementById(`mt-${f}`);
+    if (hint)  hint.textContent = defaultHints[f] || '';
+    if (thumb) { thumb.src = ''; thumb.classList.remove('show'); }
+  });
+  const vBtn = document.getElementById('videoRecordBtn');
+  if (vBtn) vBtn.textContent = '🎥 Record';
+  claimFiles = {};
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+
+(function init() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+  const saved = loadAuth();
+  if (saved?.token && saved?.email) {
+    token     = saved.token;
+    userEmail = saved.email;
+    enterApp();
+  }
+})();
+</script>
+</body>
+</html>

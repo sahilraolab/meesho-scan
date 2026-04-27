@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Meesho Scan</title>
+  <meta name="description" content="Privacy Policy for Meesho Scan — how we collect, use, and protect your data." />
+  <meta name="robots" content="noindex" />
+  <link rel="canonical" href="https://YOUR_LANDING_DOMAIN/privacy.html" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- Nav -->
+<header id="header">
+  <div class="container nav-inner">
+    <a class="nav-logo" href="index.html">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect width="22" height="22" rx="6" fill="#f43397"/><path d="M6 11h10M11 6l5 5-5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Meesho Scan
+    </a>
+    <nav class="nav-links" id="navLinks">
+      <a href="index.html#how-it-works">How it works</a>
+      <a href="index.html#install">Setup</a>
+      <a href="index.html#faq">FAQ</a>
+    </nav>
+    <a href="index.html#install" class="btn btn-primary btn-sm nav-cta">Get Started</a>
+    <button class="hamburger" id="hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<section class="legal-hero">
+  <div class="container">
+    <div class="eyebrow">Legal</div>
+    <h1>Privacy Policy</h1>
+    <p class="meta">Last updated: April 25, 2025 &nbsp;·&nbsp; Effective immediately</p>
+  </div>
+</section>
+
+<div class="container">
+  <div class="legal-body">
+
+    <p>This Privacy Policy explains how <strong>Meesho Scan</strong> ("we", "us", or "our") collects, uses, stores, and protects information when you use our barcode scanning tool, which includes the Chrome browser extension, the mobile web application (PWA), and the relay server.</p>
+
+    <p>By using Meesho Scan, you agree to the terms described in this policy.</p>
+
+    <h2>1. Information We Collect</h2>
+
+    <h3>Account Information</h3>
+    <p>When you create an account, we collect:</p>
+    <ul>
+      <li><strong>Email address</strong> — used as your unique account identifier.</li>
+      <li><strong>Password</strong> — stored as a one-way <strong>bcrypt hash</strong>. We never store or have access to your plain-text password.</li>
+    </ul>
+
+    <h3>Scan Data</h3>
+    <p>When you scan a barcode through the mobile app, we temporarily store:</p>
+    <ul>
+      <li>The <strong>AWB / barcode value</strong> scanned.</li>
+      <li>The <strong>timestamp</strong> of the scan.</li>
+      <li>The <strong>delivery status</strong> of the scan (whether it was successfully relayed to the extension).</li>
+    </ul>
+    <p>This data is stored only on <strong>your own server</strong> (the VPS you control). We do not operate a shared backend and do not have access to your scan data.</p>
+
+    <h3>Connection Data</h3>
+    <p>The server logs basic connection metadata such as IP address and connection timestamps for debugging purposes. These logs are not retained long-term and are not shared with third parties.</p>
+
+    <h3>Local Storage</h3>
+    <p>The mobile app and Chrome extension store the following data locally on your device:</p>
+    <ul>
+      <li>Authentication token (JWT) — to keep you signed in.</li>
+      <li>Scan history — for display in the app/extension. Stored only on your device.</li>
+    </ul>
+
+    <h2>2. How We Use Your Information</h2>
+    <ul>
+      <li>To authenticate your identity and maintain your session.</li>
+      <li>To relay barcode scan data between your phone and your Chrome browser in real time.</li>
+      <li>To display your scan history within the app and extension.</li>
+      <li>To detect and prevent unauthorised access.</li>
+    </ul>
+    <p>We do not use your information for advertising, profiling, or any commercial purpose beyond providing the Meesho Scan service.</p>
+
+    <h2>3. Data Storage and Security</h2>
+    <p>All data — including your account information and scan logs — is stored on <strong>the server you deploy and control</strong>. We have no access to that server or its data.</p>
+    <ul>
+      <li>Passwords are hashed using <strong>bcrypt</strong> with a work factor of 10.</li>
+      <li>Sessions are authenticated using <strong>signed JWT tokens</strong> with a 30-day expiry.</li>
+      <li>Only one active session is allowed per account at a time on each client type (mobile and extension).</li>
+      <li>All WebSocket connections use the same authentication token.</li>
+    </ul>
+    <p>You are responsible for securing your own server (firewall, HTTPS, SSH hardening, etc.).</p>
+
+    <h2>4. Data Sharing</h2>
+    <p>We do not sell, rent, or share your personal data with any third party. Meesho Scan does not include any third-party analytics, advertising SDKs, or tracking scripts.</p>
+    <p>We may disclose information if required by law or to protect our legal rights.</p>
+
+    <h2>5. Data Retention</h2>
+    <p>Scan logs are retained in the database on your server until you manually clear them. Account data is retained until you delete your account or manually remove it from the database.</p>
+    <p>The mobile app and extension store scan history locally; you can clear it at any time from the respective "Clear History" button within the app.</p>
+
+    <h2>6. Your Rights</h2>
+    <p>Since your data lives on your own server, you have full control:</p>
+    <ul>
+      <li><strong>Access</strong> — inspect the database files directly on your server.</li>
+      <li><strong>Delete</strong> — remove your account or scan records from the database at any time.</li>
+      <li><strong>Export</strong> — the data is stored in plain NEDB format and is fully portable.</li>
+    </ul>
+
+    <h2>7. Cookies</h2>
+    <p>Meesho Scan does not use cookies. Authentication state is maintained via <code>localStorage</code> in the browser.</p>
+
+    <h2>8. Children's Privacy</h2>
+    <p>Meesho Scan is intended for use by adults (18+) operating Meesho supplier businesses. We do not knowingly collect data from anyone under the age of 18.</p>
+
+    <h2>9. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. When we do, we will update the "Last updated" date at the top of this page. Continued use of Meesho Scan after changes constitutes acceptance of the updated policy.</p>
+
+    <h2>10. Contact</h2>
+    <p>If you have any questions about this Privacy Policy, please contact us at: <a href="mailto:support@YOUR_DOMAIN">support@YOUR_DOMAIN</a></p>
+
+  </div>
+</div>
+
+<footer>
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a class="footer-logo" href="index.html">
+        <svg width="20" height="20" viewBox="0 0 22 22" fill="none"><rect width="22" height="22" rx="6" fill="#f43397"/><path d="M6 11h10M11 6l5 5-5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Meesho Scan
+      </a>
+      <p class="footer-tagline">Built for Meesho sellers. Scan smarter.</p>
+    </div>
+    <div class="footer-links">
+      <div class="footer-col">
+        <div class="footer-col-title">Product</div>
+        <a href="index.html#how-it-works">How it works</a>
+        <a href="index.html#install">Setup Guide</a>
+        <a href="index.html#faq">FAQ</a>
+      </div>
+      <div class="footer-col">
+        <div class="footer-col-title">Legal</div>
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms &amp; Conditions</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">
+      <span>&copy; <span id="year"></span> Meesho Scan. All rights reserved.</span>
+      <span>Not affiliated with Meesho Internet Pvt Ltd.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+  const header = document.getElementById('header');
+  window.addEventListener('scroll', () => header.classList.toggle('scrolled', window.scrollY > 10), { passive: true });
+  const hamburger = document.getElementById('hamburger');
+  const navLinks  = document.getElementById('navLinks');
+  hamburger.addEventListener('click', () => { navLinks.classList.toggle('open'); hamburger.classList.toggle('open'); });
+</script>
+</body>
+</html>

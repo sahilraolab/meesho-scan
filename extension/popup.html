@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Meesho Scan</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Auth panel ── -->
+  <div id="panelAuth" class="panel active">
+    <div class="brand">
+      <span class="brand-icon">📦</span>
+      <div>
+        <div class="brand-name">Meesho Scan</div>
+        <div class="brand-sub" id="authSubtitle">Sign in to your account</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+
+    <button class="btn btn-primary" id="authBtn">Sign In</button>
+    <div class="err-text" id="authErr"></div>
+    <div class="toggle-link"><span id="authToggle">Don't have an account? Sign up</span></div>
+  </div>
+
+  <!-- ── Main panel ── -->
+  <div id="panelMain" class="panel">
+
+    <div class="topbar">
+      <span class="topbar-logo">📦 Meesho Scan</span>
+      <div class="topbar-right">
+        <span class="topbar-email" id="userEmail"></span>
+        <button class="btn-link" id="logoutBtn">Logout</button>
+      </div>
+    </div>
+
+    <!-- Connection status -->
+    <div id="wsStatus" class="status-bar warning">
+      <span class="status-dot"></span>
+      <div class="status-content">
+        <span id="wsStatusText">Checking Meesho tab…</span>
+        <button class="open-meesho-btn" id="openMeeshoBtn" style="display:none">Open →</button>
+      </div>
+    </div>
+    <div id="extStatus" class="status-bar warning">
+      <span class="status-dot"></span>
+      <span id="extStatusText">Phone not connected</span>
+    </div>
+
+    <!-- Claims -->
+    <div class="section-header">
+      <span class="section-title">Pending Claims</span>
+      <span id="claimBadge" class="badge" style="display:none">0</span>
+    </div>
+    <div id="claimList" class="claim-list">
+      <div class="empty">No pending claims</div>
+    </div>
+    <button class="btn btn-ghost" id="clearClaimsBtn" style="display:none">Clear claims</button>
+
+    <div class="sep"></div>
+
+    <!-- Scan log -->
+    <div class="section-header">
+      <span class="section-title">Recent Scans</span>
+    </div>
+    <div id="scanList" class="scan-list">
+      <div class="empty">No scans yet</div>
+    </div>
+    <button class="btn btn-ghost" id="clearLogBtn">Clear log</button>
+
+    <div class="sep"></div>
+
+    <!-- Manual search -->
+    <div class="section-title">Manual Search</div>
+    <div class="manual-row">
+      <input type="text" id="manualAWB" placeholder="AWB number…" />
+      <button class="btn btn-primary" id="manualGoBtn">Go</button>
+    </div>
+
+  </div>
+
+</div>
+<script src="popup.js"></script>
+</body>
+</html>

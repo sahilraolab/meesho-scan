@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(timeout 3 node index.js)",
+      "Bash(node -e ' *)",
+      "Bash(npm rebuild *)",
+      "Bash(node -e \"require\\('better-sqlite3'\\)\\(':memory:'\\); console.log\\('OK'\\)\")",
+      "Bash(cp /Users/sahil/Documents/meesho-scan/extension/icons/icon128.png /Users/sahil/Documents/meesho-scan/server/mobile/icon192.png)",
+      "Bash(cp /Users/sahil/Documents/meesho-scan/extension/icons/icon128.png /Users/sahil/Documents/meesho-scan/server/mobile/icon512.png)",
+      "Bash(node --check /Users/sahil/Documents/meesho-scan/extension/content.js)",
+      "Bash(node --check /Users/sahil/Documents/meesho-scan/extension/popup.js)",
+      "Bash(node --check /Users/sahil/Documents/meesho-scan/extension/background.js)",
+      "Bash(node --check /Users/sahil/Documents/meesho-scan/server/index.js)"
+    ]
+  }
+}
