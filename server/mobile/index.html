@@ -716,6 +716,7 @@
               <div class="media-hint" id="mh-unpacking_video">Tap record, tap again to stop</div>
             </div>
           </div>
+          <img class="media-thumb" id="mt-unpacking_video" alt="" />
           <button class="media-btn" id="videoRecordBtn" onclick="triggerMedia('unpacking_video')">🎥 Record</button>
         </div>
 
@@ -1392,10 +1393,36 @@ function applyCapture(field, file) {
   const hint = document.getElementById(`mh-${field}`);
   if (hint) hint.textContent = `${file.name} (${formatFileSize(file.size)})`;
 
+  const thumb = document.getElementById(`mt-${field}`);
   if (!isVideo) {
-    const thumb = document.getElementById(`mt-${field}`);
     if (thumb) { thumb.src = URL.createObjectURL(file); thumb.classList.add('show'); }
   } else {
+    // Generate a thumbnail by seeking a hidden video element to 0.5s and canvas-capturing
+    if (thumb) {
+      const vid = document.createElement('video');
+      vid.preload  = 'metadata';
+      vid.muted    = true;
+      vid.playsInline = true;
+      vid.src      = URL.createObjectURL(file);
+      vid.addEventListener('loadeddata', () => {
+        vid.currentTime = 0.5;
+      }, { once: true });
+      vid.addEventListener('seeked', () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width  = vid.videoWidth  || 160;
+          canvas.height = vid.videoHeight || 90;
+          canvas.getContext('2d').drawImage(vid, 0, 0, canvas.width, canvas.height);
+          thumb.src = canvas.toDataURL('image/jpeg', 0.7);
+          thumb.classList.add('show');
+        } catch (e) {
+          console.warn('[MeeshoScan] video thumbnail error:', e);
+        } finally {
+          URL.revokeObjectURL(vid.src);
+        }
+      }, { once: true });
+      vid.load();
+    }
     const btn = document.getElementById('videoRecordBtn');
     if (btn) btn.textContent = '🎥 Re-record';
   }

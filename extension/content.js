@@ -198,26 +198,67 @@
         }
       }
 
-      // ── File uploads — exact id-prefix selectors from Meesho's form HTML ────
+      // ── File uploads ─────────────────────────────────────────────────────────
+      // Each entry has a primary selector and fallback selectors in case Meesho
+      // changes the input IDs across page variants or A/B tests.
       if (srv && token) {
         const fileMap = [
-          { field: 'barcode_image',   selector: 'input[id^="barcode_image_link"]' },
-          { field: 'product_image',   selector: 'input[id^="product_image_link"]' },
-          { field: 'reverse_waybill', selector: 'input[id^="product_reverse_way_bill_link"]' },
-          { field: 'unpacking_video', selector: 'input[id^="product_openingvideo_link"]' },
+          {
+            field: 'barcode_image',
+            selectors: [
+              'input[id^="barcode_image_link"]',
+              'input[id*="barcode"]',
+              'input[accept*="image"][id*="barcode"]',
+            ],
+          },
+          {
+            field: 'product_image',
+            selectors: [
+              'input[id^="product_image_link"]',
+              'input[id*="product_image"]',
+              'input[accept*="image"][id*="product"]',
+            ],
+          },
+          {
+            field: 'reverse_waybill',
+            selectors: [
+              'input[id^="product_reverse_way_bill_link"]',
+              'input[id*="reverse_way_bill"]',
+              'input[id*="waybill"]',
+            ],
+          },
+          {
+            field: 'unpacking_video',
+            selectors: [
+              'input[id^="product_openingvideo_link"]',
+              'input[id*="openingvideo"]',
+              'input[id*="unpacking"]',
+              'input[accept*="video"]',
+            ],
+          },
         ];
-        for (const { field, selector } of fileMap) {
+
+        for (const { field, selectors } of fileMap) {
           if (!files?.[field]) continue;
           showNotification(`📎 Uploading ${field.replace(/_/g, ' ')}…`);
-          const inp = await waitForElement(selector, 6000);
+
+          // Try each selector in order until we find the input
+          let inp = null;
+          for (const selector of selectors) {
+            inp = await waitForElement(selector, field === selectors[0] ? 8000 : 1000);
+            if (inp) { console.log(`[MeeshoScan] found ${field} via: ${selector}`); break; }
+          }
+
           if (!inp) {
             showNotification(`⚠️ Upload input not found: ${field}`, true);
-            console.warn('[MeeshoScan] file input not found:', selector);
+            console.warn('[MeeshoScan] file input not found for:', field, '— tried:', selectors);
             continue;
           }
+
           const ok = await injectFile(inp, `${srv}/api/claim/${claimId}/${field}`, token, field);
           if (ok) showNotification(`✅ ${field.replace(/_/g, ' ')} uploaded`);
-          await sleep(800);
+          else showNotification(`⚠️ ${field.replace(/_/g, ' ')} may not have been accepted — check form`, true);
+          await sleep(1000);
         }
       }
 
@@ -235,60 +276,130 @@
     input.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  // Fetch file bytes via background worker (bypasses page CSP)
+  async function fetchFileViaBackground(url, token) {
+    const resp = await new Promise((resolve) =>
+      chrome.runtime.sendMessage({ type: 'fetch_file', url, token }, resolve)
+    );
+    if (!resp || !resp.ok) throw new Error(resp?.error || `HTTP ${resp?.status}`);
+    const mimeToExt = {
+      'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp',
+      'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov',
+    };
+    const mime = resp.mime || 'application/octet-stream';
+    const ext  = mimeToExt[mime] || mime.split('/')[1] || 'bin';
+    const blob = new Blob([new Uint8Array(resp.bytes)], { type: mime });
+    const name = url.split('/').pop();
+    return new File([blob], `${name}.${ext}`, { type: mime });
+  }
+
   async function injectFile(input, url, token, field) {
     try {
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) {
-        showNotification(`❌ Fetch failed: ${field} (${res.status})`, true);
-        console.warn('[MeeshoScan] file fetch failed:', res.status, url);
-        return false;
-      }
-      const blob = await res.blob();
+      const file = await fetchFileViaBackground(url, token);
+      console.log(`[MeeshoScan] fetched ${field}: ${file.name} ${file.size}b ${file.type}`);
 
-      const mimeToExt = {
-        'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp',
-        'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov',
-      };
-      const ext = mimeToExt[blob.type] || blob.type.split('/')[1] || 'bin';
-      const fieldName = url.split('/').pop();
-      const file = new File([blob], `${fieldName}.${ext}`, { type: blob.type });
+      // ── Strategy: intercept the input's click so the file picker never opens,
+      // then inject our file and fire React's change pipeline ──────────────────
+
       const dt = new DataTransfer();
       dt.items.add(file);
 
-      // Set files on the input instance before dispatching events
-      Object.defineProperty(input, 'files', { value: dt.files, writable: true, configurable: true });
+      // Step 1 — neutralise .click() so when Meesho's button triggers the
+      // hidden file input, no OS dialog appears
+      const origClick = HTMLInputElement.prototype.click;
+      HTMLInputElement.prototype.click = function() {
+        if (this === input) return; // block only our target input
+        origClick.call(this);
+      };
 
-      // Path 1: native DOM change event — React's root listener and any direct listeners pick this up
-      input.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
-      await sleep(100);
+      // Step 2 — set up a one-shot 'click' interceptor on the input itself
+      // to inject files the moment the input is "activated"
+      const clickInterceptor = (e) => {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        triggerReactFileChange(input, dt.files);
+      };
+      input.addEventListener('click', clickInterceptor, { capture: true, once: true });
 
-      // Path 2: call React fiber's onChange prop directly (handles components that use refs instead of events)
-      const fiberKey = Object.keys(input).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
-      if (fiberKey) {
-        const onChange = input[fiberKey]?.memoizedProps?.onChange;
-        if (typeof onChange === 'function') {
-          try {
-            onChange({ target: input, currentTarget: input, nativeEvent: { target: input }, preventDefault() {}, stopPropagation() {} });
-          } catch {}
-        }
-      }
+      // Step 3 — directly trigger without waiting for a user click
+      await triggerReactFileChange(input, dt.files);
 
-      // Path 3: simulate a label click with files already injected — triggers any click-based upload handlers
-      const label = input.id ? document.querySelector(`label[for="${input.id}"]`) : null;
-      if (label) {
-        // Override click temporarily so it doesn't open the file dialog
-        const origClick = HTMLInputElement.prototype.click;
-        HTMLInputElement.prototype.click = function () {};
-        label.click();
-        HTMLInputElement.prototype.click = origClick;
-      }
+      // Restore .click()
+      HTMLInputElement.prototype.click = origClick;
+      input.removeEventListener('click', clickInterceptor, { capture: true });
 
-      return true;
+      // Step 4 — verify
+      await sleep(300);
+      const accepted = input.files && input.files.length > 0;
+      console.log(`[MeeshoScan] ${field} accepted=${accepted} files=${input.files?.length}`);
+      return accepted;
+
     } catch (err) {
       showNotification(`❌ Upload error: ${field}: ${err.message}`, true);
       console.warn('[MeeshoScan] injectFile error:', err);
       return false;
     }
+  }
+
+  async function triggerReactFileChange(input, fileList) {
+    // Use the native prototype setter — this bypasses React's "last known value"
+    // tracker which compares new vs old FileList by reference
+    const nativeSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, 'files'
+    )?.set;
+
+    if (nativeSetter) {
+      nativeSetter.call(input, fileList);
+    } else {
+      Object.defineProperty(input, 'files', {
+        value: fileList, writable: true, configurable: true,
+      });
+    }
+
+    // React 17/18 listens via event delegation on the root — fire both events
+    input.dispatchEvent(new Event('input',  { bubbles: true, cancelable: true }));
+    await sleep(30);
+    input.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+    await sleep(50);
+
+    // Also call the React fiber's onChange prop directly — needed for components
+    // that use createRef / useRef and read files from the ref, not from events
+    const fiberKey = Object.keys(input).find(k =>
+      k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance')
+    );
+    if (fiberKey) {
+      let fiber = input[fiberKey];
+      let steps = 0;
+      while (fiber && steps++ < 15) {
+        const onChange = fiber.memoizedProps?.onChange;
+        if (typeof onChange === 'function') {
+          try {
+            // Build a synthetic event that looks like what React would produce
+            const nativeEvt = new Event('change', { bubbles: true });
+            Object.defineProperty(nativeEvt, 'target', { value: input, configurable: true });
+            onChange({
+              target: input,
+              currentTarget: input,
+              nativeEvent: nativeEvt,
+              bubbles: true,
+              cancelable: true,
+              defaultPrevented: false,
+              preventDefault()  {},
+              stopPropagation() {},
+              isPropagationStopped() { return false; },
+              isDefaultPrevented()   { return false; },
+              persist() {},
+              type: 'change',
+            });
+          } catch (e) {
+            console.warn('[MeeshoScan] fiber onChange error:', e);
+          }
+          break;
+        }
+        fiber = fiber.return;
+      }
+    }
+    await sleep(50);
   }
 
   function chromeGet(keys) {
