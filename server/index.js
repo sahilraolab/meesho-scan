@@ -87,7 +87,13 @@ console.log(`[DB] ${DATA_DIR}`);
 const app    = express();
 const server = http.createServer(app);
 
-app.use(cors({ origin: '*' }));
+app.use(cors({
+  origin: [
+    'https://meesho.techseventeen.com',
+    'https://scanserver.techseventeen.com',
+  ],
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'mobile')));
 app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'mobile', 'index.html')));

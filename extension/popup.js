@@ -1,6 +1,6 @@
 'use strict';
 
-const SERVER = 'http://127.0.0.1:3847';
+const SERVER = 'https://scanserver.techseventeen.com';
 
 let authMode     = 'login';
 let currentClaims = [];
