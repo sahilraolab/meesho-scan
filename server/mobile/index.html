@@ -974,58 +974,120 @@ function isMobileDevice() {
 }
 
 async function getPreferredVideoDeviceId() {
-  if (!navigator.mediaDevices?.enumerateDevices) return null;
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    console.warn('[getPreferredVideoDeviceId] enumerateDevices not available');
+    return null;
+  }
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
+    console.log('[getPreferredVideoDeviceId] Available devices:', devices.length);
+    devices.forEach((d, i) => {
+      console.log(`  [${i}] ${d.kind}: ${d.label || '(unknown)'}`);
+    });
     const videoDevices = devices.filter(d => d.kind === 'videoinput');
+    console.log('[getPreferredVideoDeviceId] Video inputs found:', videoDevices.length);
     return videoDevices.length ? videoDevices[0].deviceId : null;
-  } catch {
+  } catch (err) {
+    console.error('[getPreferredVideoDeviceId] Error enumerating devices:', err);
     return null;
   }
 }
 
 async function getCameraStream() {
-  if (!navigator.mediaDevices?.getUserMedia) return null;
+  if (!navigator.mediaDevices?.getUserMedia) {
+    console.error('[getCameraStream] getUserMedia not available');
+    return null;
+  }
   const isMobile = isMobileDevice();
+  console.log('[getCameraStream] Device type:', isMobile ? 'mobile' : 'desktop');
+  
   const deviceId = await getPreferredVideoDeviceId();
+  if (deviceId) console.log('[getCameraStream] Using device ID:', deviceId);
+  
   const attempts = [
     ...(isMobile ? [{ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } }] : []),
     ...(deviceId ? [{ video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } }] : []),
     { video: { width: { ideal: 1280 }, height: { ideal: 720 } } },
     { video: true },
   ];
-  for (const c of attempts) {
-    try { return await navigator.mediaDevices.getUserMedia({ ...c, audio: false }); } catch (err) {
-      console.warn('Camera constraint failed:', c, err?.name || err?.message || err);
+  
+  for (let i = 0; i < attempts.length; i++) {
+    const constraint = attempts[i];
+    console.log(`[getCameraStream] Attempt ${i + 1}/${attempts.length}:`, JSON.stringify(constraint));
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ ...constraint, audio: false });
+      console.log(`[getCameraStream] ✓ Success with attempt ${i + 1}`);
+      return stream;
+    } catch (err) {
+      console.warn(`[getCameraStream] ✗ Attempt ${i + 1} failed:`, err?.name || err?.message || err);
     }
   }
+  console.error('[getCameraStream] All attempts failed');
   return null;
 }
 
 async function getClaimCameraStream() {
-  if (!navigator.mediaDevices?.getUserMedia) return null;
+  if (!navigator.mediaDevices?.getUserMedia) {
+    console.error('[getClaimCameraStream] getUserMedia not available');
+    return null;
+  }
   const isMobile = isMobileDevice();
+  console.log('[getClaimCameraStream] Device type:', isMobile ? 'mobile' : 'desktop');
+  
   const deviceId = await getPreferredVideoDeviceId();
+  if (deviceId) console.log('[getClaimCameraStream] Using device ID:', deviceId);
+  
   const attempts = [
     ...(isMobile ? [{ video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } }] : []),
     ...(deviceId ? [{ video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } } }] : []),
     { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
     { video: true },
   ];
-  for (const c of attempts) {
-    try { return await navigator.mediaDevices.getUserMedia({ ...c, audio: false }); } catch (err) {
-      console.warn('Claim camera constraint failed:', c, err?.name || err?.message || err);
+  
+  for (let i = 0; i < attempts.length; i++) {
+    const constraint = attempts[i];
+    console.log(`[getClaimCameraStream] Attempt ${i + 1}/${attempts.length}:`, JSON.stringify(constraint));
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ ...constraint, audio: false });
+      console.log(`[getClaimCameraStream] ✓ Success with attempt ${i + 1}`);
+      return stream;
+    } catch (err) {
+      console.warn(`[getClaimCameraStream] ✗ Attempt ${i + 1} failed:`, err?.name || err?.message || err);
     }
   }
+  console.error('[getClaimCameraStream] All attempts failed');
   return null;
 }
 
 async function startCamera() {
+  console.log('[Camera] Starting scan camera...');
   scanStream = await getCameraStream();
-  if (!scanStream) { showToast('Camera access denied. Use manual input.', 'error', 4000); return; }
+  if (!scanStream) {
+    console.error('[Camera] Failed to get camera stream');
+    showToast('Camera access denied. Use manual input.', 'error', 4000);
+    return;
+  }
+  console.log('[Camera] Stream acquired, setting up video element');
   const video = document.getElementById('scanVideo');
   video.srcObject = scanStream;
-  await video.play();
+  
+  // Add event listeners to debug video playback
+  video.onloadedmetadata = () => {
+    console.log(`[Camera] Video loaded: ${video.videoWidth}x${video.videoHeight}`);
+  };
+  video.onerror = (e) => {
+    console.error('[Camera] Video element error:', e);
+  };
+  
+  try {
+    await video.play();
+    console.log('[Camera] Video playing successfully');
+  } catch (err) {
+    console.error('[Camera] Video play failed:', err);
+    showToast('Could not start video playback', 'error', 4000);
+    return;
+  }
+  
   initDetector();
 }
 
@@ -1036,13 +1098,22 @@ function stopCamera() {
 }
 
 function initDetector() {
+  console.log('[Detector] Checking BarcodeDetector availability...');
   if ('BarcodeDetector' in window) {
-    detector = new BarcodeDetector({ formats: [
-      'code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'data_matrix', 'itf', 'upc_a', 'upc_e',
-    ]});
-    requestAnimationFrame(detectLoop);
+    console.log('[Detector] BarcodeDetector available, initializing...');
+    try {
+      detector = new BarcodeDetector({ formats: [
+        'code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'data_matrix', 'itf', 'upc_a', 'upc_e',
+      ]});
+      console.log('[Detector] BarcodeDetector initialized successfully');
+      requestAnimationFrame(detectLoop);
+    } catch (err) {
+      console.error('[Detector] Failed to initialize BarcodeDetector:', err);
+      document.querySelector('.scanner-hint').textContent =
+        'BarcodeDetector failed to initialize — use manual input below';
+    }
   } else {
-    // Fallback: show manual input hint
+    console.warn('[Detector] BarcodeDetector not available in this browser');
     document.querySelector('.scanner-hint').textContent =
       'BarcodeDetector not available — use manual input below';
   }
@@ -1055,10 +1126,13 @@ async function detectLoop() {
     try {
       const barcodes = await detector.detect(video);
       if (barcodes.length > 0) {
+        console.log('[Detector] Barcode detected:', barcodes[0].rawValue);
         const awb = barcodes[0].rawValue.trim().toUpperCase();
         sendScan(awb);
       }
-    } catch {}
+    } catch (err) {
+      console.error('[Detector] Detection error:', err?.message || err);
+    }
   }
   scanLoop = requestAnimationFrame(detectLoop);
 }
@@ -1181,11 +1255,30 @@ function switchTab(tab) {
 // ── Claim camera ──────────────────────────────────────────────────────────────
 
 async function startClaimCamera() {
+  console.log('[ClaimCamera] Starting claim camera...');
   claimStream = await getClaimCameraStream();
-  if (!claimStream) { showToast('Camera access denied.', 'error', 4000); return; }
+  if (!claimStream) {
+    console.error('[ClaimCamera] Failed to get camera stream');
+    showToast('Camera access denied.', 'error', 4000);
+    return;
+  }
+  console.log('[ClaimCamera] Stream acquired, setting up video element');
   const video = document.getElementById('claimVideo');
   video.srcObject = claimStream;
-  await video.play();
+  
+  video.onloadedmetadata = () => {
+    console.log(`[ClaimCamera] Video loaded: ${video.videoWidth}x${video.videoHeight}`);
+  };
+  
+  try {
+    await video.play();
+    console.log('[ClaimCamera] Video playing successfully');
+  } catch (err) {
+    console.error('[ClaimCamera] Video play failed:', err);
+    showToast('Could not start claim video', 'error', 4000);
+    return;
+  }
+  
   initClaimDetector();
 }
 
