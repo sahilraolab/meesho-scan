@@ -973,28 +973,49 @@ function isMobileDevice() {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
+async function getPreferredVideoDeviceId() {
+  if (!navigator.mediaDevices?.enumerateDevices) return null;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = devices.filter(d => d.kind === 'videoinput');
+    return videoDevices.length ? videoDevices[0].deviceId : null;
+  } catch {
+    return null;
+  }
+}
+
 async function getCameraStream() {
+  if (!navigator.mediaDevices?.getUserMedia) return null;
   const isMobile = isMobileDevice();
+  const deviceId = await getPreferredVideoDeviceId();
   const attempts = [
     ...(isMobile ? [{ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } }] : []),
+    ...(deviceId ? [{ video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } }] : []),
     { video: { width: { ideal: 1280 }, height: { ideal: 720 } } },
     { video: true },
   ];
   for (const c of attempts) {
-    try { return await navigator.mediaDevices.getUserMedia({ ...c, audio: false }); } catch {}
+    try { return await navigator.mediaDevices.getUserMedia({ ...c, audio: false }); } catch (err) {
+      console.warn('Camera constraint failed:', c, err?.name || err?.message || err);
+    }
   }
   return null;
 }
 
 async function getClaimCameraStream() {
+  if (!navigator.mediaDevices?.getUserMedia) return null;
   const isMobile = isMobileDevice();
+  const deviceId = await getPreferredVideoDeviceId();
   const attempts = [
     ...(isMobile ? [{ video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } }] : []),
+    ...(deviceId ? [{ video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } } }] : []),
     { video: { width: { ideal: 640 }, height: { ideal: 480 } } },
     { video: true },
   ];
   for (const c of attempts) {
-    try { return await navigator.mediaDevices.getUserMedia({ ...c, audio: false }); } catch {}
+    try { return await navigator.mediaDevices.getUserMedia({ ...c, audio: false }); } catch (err) {
+      console.warn('Claim camera constraint failed:', c, err?.name || err?.message || err);
+    }
   }
   return null;
 }
