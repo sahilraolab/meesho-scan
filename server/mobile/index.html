@@ -10,6 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="Meesho Scan" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/icon192.png" />
+  <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
   <title>Meesho Scan</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1094,7 +1095,11 @@ async function startCamera() {
 function stopCamera() {
   if (scanLoop) cancelAnimationFrame(scanLoop);
   scanLoop = null;
+  if (typeof Quagga !== 'undefined' && Quagga.initialized) {
+    Quagga.stop();
+  }
   if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  detector = null;
 }
 
 function initDetector() {
@@ -1109,14 +1114,70 @@ function initDetector() {
       requestAnimationFrame(detectLoop);
     } catch (err) {
       console.error('[Detector] Failed to initialize BarcodeDetector:', err);
-      document.querySelector('.scanner-hint').textContent =
-        'BarcodeDetector failed to initialize — use manual input below';
+      initQuaggaDetector();
     }
   } else {
-    console.warn('[Detector] BarcodeDetector not available in this browser');
-    document.querySelector('.scanner-hint').textContent =
-      'BarcodeDetector not available — use manual input below';
+    console.warn('[Detector] BarcodeDetector not available, using QuaggaJS fallback');
+    initQuaggaDetector();
   }
+}
+
+function initQuaggaDetector() {
+  if (typeof Quagga === 'undefined') {
+    console.error('[Detector] QuaggaJS not loaded');
+    document.querySelector('.scanner-hint').textContent = 'Barcode scanning not available — use manual input below';
+    return;
+  }
+
+  console.log('[Detector] Initializing QuaggaJS...');
+  const video = document.getElementById('scanVideo');
+  
+  Quagga.init({
+    inputStream: {
+      name: "Live",
+      type: "LiveStream",
+      target: video,
+      constraints: {
+        width: 640,
+        height: 480,
+        facingMode: "environment"
+      }
+    },
+    locator: {
+      patchSize: "medium",
+      halfSample: true
+    },
+    numOfWorkers: 2,
+    decoder: {
+      readers: [
+        "code_128_reader",
+        "code_39_reader", 
+        "ean_reader",
+        "ean_8_reader",
+        "qr_code_reader",
+        "data_matrix_reader",
+        "i2of5_reader",
+        "upc_reader",
+        "upc_e_reader"
+      ]
+    },
+    locate: true
+  }, function(err) {
+    if (err) {
+      console.error('[Detector] QuaggaJS initialization failed:', err);
+      document.querySelector('.scanner-hint').textContent = 'Barcode scanning failed — use manual input below';
+      return;
+    }
+    console.log('[Detector] QuaggaJS initialized successfully');
+    Quagga.start();
+    Quagga.onDetected(function(result) {
+      if (result && result.codeResult && !cooldown) {
+        const code = result.codeResult.code;
+        console.log('[Detector] Barcode detected via QuaggaJS:', code);
+        sendScan(code);
+      }
+    });
+  });
 }
 
 async function detectLoop() {
@@ -1284,16 +1345,76 @@ async function startClaimCamera() {
 
 function stopClaimCamera() {
   if (claimLoop) { cancelAnimationFrame(claimLoop); claimLoop = null; }
+  if (typeof Quagga !== 'undefined' && Quagga.initialized) {
+    Quagga.stop();
+  }
   if (claimStream) { claimStream.getTracks().forEach(t => t.stop()); claimStream = null; }
   claimDetector = null;
 }
 
 function initClaimDetector() {
-  if (!('BarcodeDetector' in window)) return;
+  if (!('BarcodeDetector' in window)) {
+    initClaimQuaggaDetector();
+    return;
+  }
   claimDetector = new BarcodeDetector({ formats: [
     'code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'data_matrix', 'itf', 'upc_a', 'upc_e',
   ]});
   requestAnimationFrame(claimDetectLoop);
+}
+
+function initClaimQuaggaDetector() {
+  if (typeof Quagga === 'undefined') return;
+  
+  const video = document.getElementById('claimVideo');
+  
+  Quagga.init({
+    inputStream: {
+      name: "Live",
+      type: "LiveStream",
+      target: video,
+      constraints: {
+        width: 640,
+        height: 480,
+        facingMode: "environment"
+      }
+    },
+    locator: {
+      patchSize: "medium",
+      halfSample: true
+    },
+    numOfWorkers: 2,
+    decoder: {
+      readers: [
+        "code_128_reader",
+        "code_39_reader", 
+        "ean_reader",
+        "ean_8_reader",
+        "qr_code_reader",
+        "data_matrix_reader",
+        "i2of5_reader",
+        "upc_reader",
+        "upc_e_reader"
+      ]
+    },
+    locate: true
+  }, function(err) {
+    if (err) {
+      console.error('[ClaimDetector] QuaggaJS initialization failed:', err);
+      return;
+    }
+    console.log('[ClaimDetector] QuaggaJS initialized successfully');
+    Quagga.start();
+    Quagga.onDetected(function(result) {
+      if (result && result.codeResult && !claimCooldown) {
+        const code = result.codeResult.code;
+        console.log('[ClaimDetector] Barcode detected via QuaggaJS:', code);
+        setClaimField(claimTarget, code);
+        claimCooldown = true;
+        setTimeout(() => { claimCooldown = false; }, 2000);
+      }
+    });
+  });
 }
 
 async function claimDetectLoop() {
