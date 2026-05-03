@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE = 'meesho-scan-v7';
+const CACHE = 'meesho-scan-v8';
 const SHELL = ['/', '/index.html', 'https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js'];
 
 self.addEventListener('install', e => {

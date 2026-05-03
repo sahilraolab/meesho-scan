@@ -1095,8 +1095,9 @@ async function startCamera() {
 function stopCamera() {
   if (scanLoop) cancelAnimationFrame(scanLoop);
   scanLoop = null;
-  if (typeof Quagga !== 'undefined' && Quagga.initialized) {
-    Quagga.stop();
+  if (typeof Quagga !== 'undefined') {
+    // Stop any QuaggaJS processing
+    try { Quagga.stop(); } catch {}
   }
   if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
   detector = null;
@@ -1123,31 +1124,17 @@ function initDetector() {
 }
 
 function initQuaggaDetector() {
+  console.log('[Detector] Checking if QuaggaJS is loaded...');
   if (typeof Quagga === 'undefined') {
-    console.error('[Detector] QuaggaJS not loaded');
-    document.querySelector('.scanner-hint').textContent = 'Barcode scanning not available — use manual input below';
+    console.error('[Detector] QuaggaJS not loaded - script failed to load');
+    document.querySelector('.scanner-hint').textContent = 'Barcode scanning library failed to load — use manual input below';
     return;
   }
 
-  console.log('[Detector] Initializing QuaggaJS...');
-  const video = document.getElementById('scanVideo');
+  console.log('[Detector] QuaggaJS loaded, setting up frame-based detection...');
   
+  // Configure QuaggaJS for single image decoding
   Quagga.init({
-    inputStream: {
-      name: "Live",
-      type: "LiveStream",
-      target: video,
-      constraints: {
-        width: 640,
-        height: 480,
-        facingMode: "environment"
-      }
-    },
-    locator: {
-      patchSize: "medium",
-      halfSample: true
-    },
-    numOfWorkers: 2,
     decoder: {
       readers: [
         "code_128_reader",
@@ -1160,24 +1147,64 @@ function initQuaggaDetector() {
         "upc_reader",
         "upc_e_reader"
       ]
-    },
-    locate: true
+    }
   }, function(err) {
     if (err) {
       console.error('[Detector] QuaggaJS initialization failed:', err);
-      document.querySelector('.scanner-hint').textContent = 'Barcode scanning failed — use manual input below';
+      document.querySelector('.scanner-hint').textContent = 'Barcode scanning failed to initialize — use manual input below';
       return;
     }
-    console.log('[Detector] QuaggaJS initialized successfully');
-    Quagga.start();
-    Quagga.onDetected(function(result) {
-      if (result && result.codeResult && !cooldown) {
-        const code = result.codeResult.code;
-        console.log('[Detector] Barcode detected via QuaggaJS:', code);
-        sendScan(code);
-      }
-    });
+    console.log('[Detector] QuaggaJS initialized for frame processing, starting detection loop');
+    requestAnimationFrame(quaggaDetectLoop);
   });
+}
+
+async function quaggaDetectLoop() {
+  if (!scanStream) return;
+  
+  const video = document.getElementById('scanVideo');
+  if (video.readyState >= 2 && !cooldown) {
+    try {
+      // Create a canvas to capture the current frame
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      
+      // Use QuaggaJS to decode the frame
+      Quagga.decodeSingle({
+        src: canvas.toDataURL('image/png'),
+        numOfWorkers: 1,
+        inputStream: {
+          size: 800
+        },
+        decoder: {
+          readers: [
+            "code_128_reader",
+            "code_39_reader", 
+            "ean_reader",
+            "ean_8_reader",
+            "qr_code_reader",
+            "data_matrix_reader",
+            "i2of5_reader",
+            "upc_reader",
+            "upc_e_reader"
+          ]
+        }
+      }, function(result) {
+        if (result && result.codeResult) {
+          const code = result.codeResult.code;
+          console.log('[Detector] Barcode detected via QuaggaJS:', code);
+          sendScan(code);
+        }
+      });
+    } catch (err) {
+      console.error('[Detector] Frame processing error:', err);
+    }
+  }
+  
+  requestAnimationFrame(quaggaDetectLoop);
 }
 
 async function detectLoop() {
@@ -1345,8 +1372,9 @@ async function startClaimCamera() {
 
 function stopClaimCamera() {
   if (claimLoop) { cancelAnimationFrame(claimLoop); claimLoop = null; }
-  if (typeof Quagga !== 'undefined' && Quagga.initialized) {
-    Quagga.stop();
+  if (typeof Quagga !== 'undefined') {
+    // Stop any QuaggaJS processing
+    try { Quagga.stop(); } catch {}
   }
   if (claimStream) { claimStream.getTracks().forEach(t => t.stop()); claimStream = null; }
   claimDetector = null;
@@ -1364,57 +1392,68 @@ function initClaimDetector() {
 }
 
 function initClaimQuaggaDetector() {
-  if (typeof Quagga === 'undefined') return;
+  console.log('[ClaimDetector] Checking if QuaggaJS is loaded...');
+  if (typeof Quagga === 'undefined') {
+    console.error('[ClaimDetector] QuaggaJS not loaded');
+    return;
+  }
+  
+  console.log('[ClaimDetector] QuaggaJS loaded, setting up frame-based detection for claim camera...');
+  
+  // Configure QuaggaJS for single image decoding (reuse the same instance)
+  // Note: This will reuse the same QuaggaJS instance, which should be fine
+  console.log('[ClaimDetector] QuaggaJS initialized for claim camera frame processing');
+  requestAnimationFrame(quaggaClaimDetectLoop);
+}
+
+async function quaggaClaimDetectLoop() {
+  if (!claimStream) return;
   
   const video = document.getElementById('claimVideo');
-  
-  Quagga.init({
-    inputStream: {
-      name: "Live",
-      type: "LiveStream",
-      target: video,
-      constraints: {
-        width: 640,
-        height: 480,
-        facingMode: "environment"
-      }
-    },
-    locator: {
-      patchSize: "medium",
-      halfSample: true
-    },
-    numOfWorkers: 2,
-    decoder: {
-      readers: [
-        "code_128_reader",
-        "code_39_reader", 
-        "ean_reader",
-        "ean_8_reader",
-        "qr_code_reader",
-        "data_matrix_reader",
-        "i2of5_reader",
-        "upc_reader",
-        "upc_e_reader"
-      ]
-    },
-    locate: true
-  }, function(err) {
-    if (err) {
-      console.error('[ClaimDetector] QuaggaJS initialization failed:', err);
-      return;
+  if (video.readyState >= 2 && !claimCooldown) {
+    try {
+      // Create a canvas to capture the current frame
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      
+      // Use QuaggaJS to decode the frame
+      Quagga.decodeSingle({
+        src: canvas.toDataURL('image/png'),
+        numOfWorkers: 1,
+        inputStream: {
+          size: 800
+        },
+        decoder: {
+          readers: [
+            "code_128_reader",
+            "code_39_reader", 
+            "ean_reader",
+            "ean_8_reader",
+            "qr_code_reader",
+            "data_matrix_reader",
+            "i2of5_reader",
+            "upc_reader",
+            "upc_e_reader"
+          ]
+        }
+      }, function(result) {
+        if (result && result.codeResult) {
+          const code = result.codeResult.code;
+          console.log('[ClaimDetector] Barcode detected via QuaggaJS:', code);
+          setClaimField(claimTarget, code);
+          claimCooldown = true;
+          setTimeout(() => { claimCooldown = false; }, 2000);
+        }
+      });
+    } catch (err) {
+      console.error('[ClaimDetector] Frame processing error:', err);
     }
-    console.log('[ClaimDetector] QuaggaJS initialized successfully');
-    Quagga.start();
-    Quagga.onDetected(function(result) {
-      if (result && result.codeResult && !claimCooldown) {
-        const code = result.codeResult.code;
-        console.log('[ClaimDetector] Barcode detected via QuaggaJS:', code);
-        setClaimField(claimTarget, code);
-        claimCooldown = true;
-        setTimeout(() => { claimCooldown = false; }, 2000);
-      }
-    });
-  });
+  }
+  
+  requestAnimationFrame(quaggaClaimDetectLoop);
 }
 
 async function claimDetectLoop() {
