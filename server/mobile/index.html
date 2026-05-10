@@ -776,10 +776,6 @@
               <canvas id="packetCanvas"></canvas>
               <div class="scan-overlay"><div class="scan-frame"><div class="scan-line"></div></div></div>
             </div>
-            <div style="margin-top:10px; display:flex; gap:8px;">
-              <button class="btn btn-primary" style="flex:1" onclick="startPacketCamera()">▶ Start</button>
-              <button class="btn btn-secondary" style="flex:1" onclick="stopPacketCamera()">⏹ Stop</button>
-            </div>
           </div>
           <div id="packetGunDiv" style="display:none; margin-top:10px">
             <div class="field">
@@ -1298,7 +1294,12 @@ function setPacketMode(mode) {
   $('tabPacketGun').classList.toggle('active', mode === 'gun');
   $('packetCameraDiv').style.display = mode === 'camera' ? 'block' : 'none';
   $('packetGunDiv').style.display    = mode === 'gun'    ? 'block' : 'none';
-  if (mode === 'gun') setTimeout(() => $('packetGunInput').focus(), 100);
+  if (mode === 'gun') {
+    stopPacketCamera();
+    setTimeout(() => $('packetGunInput').focus(), 100);
+  } else if ($('addStep2').style.display !== 'none') {
+    startPacketCamera();
+  }
 }
 
 // ── Camera (BarcodeDetector primary, QuaggaJS LiveStream fallback) ────────────
@@ -1383,6 +1384,7 @@ function initQuaggaDetector() {
       type: 'LiveStream',
       target: $('scanVideo').parentElement,
       constraints: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      area: { top: '28%', right: '18%', bottom: '28%', left: '18%' },
     },
     decoder: { readers: ['code_128_reader', 'ean_reader', 'code_39_reader', 'codabar_reader', 'upc_reader'] },
     locate: true,
@@ -1401,9 +1403,10 @@ function initQuaggaDetector() {
 async function detectLoop() {
   if (!scanStream) return;
   const video = $('scanVideo');
-  if (video.readyState >= 2 && detector && !cooldown) {
+  if (video.readyState >= 2 && video.videoWidth > 0 && detector && !cooldown) {
     try {
-      const barcodes = await detector.detect(video);
+      const frame = cropToViewfinder(video, _scanCanvas, _scanCtx);
+      const barcodes = await detector.detect(frame);
       if (barcodes.length) {
         const awb = barcodes[0].rawValue.trim().toUpperCase();
         cooldown = true;
@@ -1417,19 +1420,35 @@ async function detectLoop() {
 
 async function startPacketCamera() {
   if (packetStream || packetQuagga) return;
-  // Use same constraints as main camera for best quality
-  packetStream = await getCameraStream();
-  if (!packetStream) { toast('Camera access denied', 'error'); return; }
-  const video = $('packetVideo');
-  video.srcObject = packetStream;
-  try { await video.play(); } catch {
-    toast('Could not start packet camera', 'error');
-    packetStream.getTracks().forEach(t => t.stop());
-    packetStream = null;
-    return;
-  }
   packetCooldown = false;
-  initPacketDetector();
+
+  if ('BarcodeDetector' in window) {
+    // BarcodeDetector path: acquire and manage the stream ourselves
+    packetStream = await getCameraStream();
+    if (!packetStream) { toast('Camera access denied', 'error'); return; }
+    const video = $('packetVideo');
+    video.srcObject = packetStream;
+    try { await video.play(); } catch {
+      toast('Could not start packet camera', 'error');
+      packetStream.getTracks().forEach(t => t.stop());
+      packetStream = null;
+      return;
+    }
+    try {
+      packetDetector = new BarcodeDetector({ formats: [
+        'code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'data_matrix', 'itf', 'upc_a', 'upc_e',
+      ]});
+      packetLoop = requestAnimationFrame(packetDetectLoop);
+    } catch {
+      // BarcodeDetector failed — release stream and fall through to Quagga
+      packetStream.getTracks().forEach(t => t.stop());
+      packetStream = null;
+      initPacketQuaggaDetector();
+    }
+  } else {
+    // Quagga path: let Quagga acquire the camera directly (no intermediate stream)
+    initPacketQuaggaDetector();
+  }
 }
 
 function stopPacketCamera() {
@@ -1444,23 +1463,9 @@ function stopPacketCamera() {
   if (packetStream) { packetStream.getTracks().forEach(t => t.stop()); packetStream = null; }
 }
 
-function initPacketDetector() {
-  if ('BarcodeDetector' in window) {
-    try {
-      // Same formats as main camera
-      packetDetector = new BarcodeDetector({ formats: [
-        'code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'data_matrix', 'itf', 'upc_a', 'upc_e',
-      ]});
-      packetLoop = requestAnimationFrame(packetDetectLoop);
-      return;
-    } catch {}
-  }
-  initPacketQuaggaDetector();
-}
 
 function initPacketQuaggaDetector() {
   if (typeof Quagga === 'undefined') { toast('Barcode library not loaded', 'error'); return; }
-  if (packetStream) { packetStream.getTracks().forEach(t => t.stop()); packetStream = null; }
   _packetQuaggaHandler = (result) => {
     const id = result?.codeResult?.code;
     if (id && id.length >= 4 && !packetCooldown) {
@@ -1493,16 +1498,44 @@ function initPacketQuaggaDetector() {
   });
 }
 
-// Reusable offscreen canvas for frame capture (avoids creating one per frame)
+// Reusable offscreen canvases for cropped frame detection
+const _scanCanvas   = document.createElement('canvas');
+const _scanCtx      = _scanCanvas.getContext('2d', { willReadFrequently: true });
 const _packetCanvas = document.createElement('canvas');
-const _packetCtx = _packetCanvas.getContext('2d', { willReadFrequently: true });
+const _packetCtx    = _packetCanvas.getContext('2d', { willReadFrequently: true });
+
+// Crop the video frame to the viewfinder square before detection.
+// The .scan-frame overlay is width=65%, aspect-ratio 3/2, centered in a 1:1 container.
+// Accounts for object-fit: cover (landscape video is height-cropped from center, portrait vice-versa).
+function cropToViewfinder(video, canvas, ctx) {
+  const vW = video.videoWidth, vH = video.videoHeight;
+  if (!vW || !vH) return video;
+  // Which square of pixels is actually visible inside the 1:1 container?
+  let srcX, srcY, srcSize;
+  if (vW >= vH) {
+    srcSize = vH; srcX = (vW - vH) / 2; srcY = 0;
+  } else {
+    srcSize = vW; srcX = 0; srcY = (vH - vW) / 2;
+  }
+  const FRAME_W    = 0.65;
+  const FRAME_H    = FRAME_W * (2 / 3); // aspect-ratio 3/2
+  const FRAME_LEFT = (1 - FRAME_W) / 2;
+  const FRAME_TOP  = (1 - FRAME_H) / 2;
+  const cropX = srcX + FRAME_LEFT * srcSize;
+  const cropY = srcY + FRAME_TOP  * srcSize;
+  const cropW = FRAME_W * srcSize;
+  const cropH = FRAME_H * srcSize;
+  canvas.width  = Math.round(cropW);
+  canvas.height = Math.round(cropH);
+  ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
 
 async function packetDetectLoop() {
   if (!packetStream) return;
   const video = $('packetVideo');
   if (video.readyState >= 2 && video.videoWidth > 0 && packetDetector && !packetCooldown) {
     try {
-      // Draw to canvas first — more reliable than passing video directly to BarcodeDetector
       _packetCanvas.width  = video.videoWidth;
       _packetCanvas.height = video.videoHeight;
       _packetCtx.drawImage(video, 0, 0);
@@ -1703,9 +1736,13 @@ function setStepActive(step) {
   });
 }
 
-function goClaimStep1() { setStepActive(1); }
-function goClaimStep2() { setStepActive(2); }
+function goClaimStep1() { stopPacketCamera(); setStepActive(1); }
+function goClaimStep2() {
+  setStepActive(2);
+  if (activePacketMode === 'camera') startPacketCamera();
+}
 function goClaimStep3() {
+  stopPacketCamera();
   claimPacketId = $('packetIdConfirm').value.trim() || null;
   $('confirmAwb').textContent = claimAwbVal || '—';
   $('confirmSubOrder').textContent = claimSubOrderVal || '(not found)';
