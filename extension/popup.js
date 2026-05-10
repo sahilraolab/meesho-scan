@@ -1,7 +1,10 @@
 'use strict';
 
-const SERVER = 'https://scanserver.techseventeen.com';
+// The server URL is stored in chrome.storage after first login.
+// Default to the production URL. For dev, change this constant or update storage manually.
+const DEFAULT_SERVER = 'https://scanserver.techseventeen.com';
 
+let SERVER       = DEFAULT_SERVER;
 let authMode     = 'login';
 let currentClaims = [];
 
@@ -10,6 +13,7 @@ function $(id) { return document.getElementById(id); }
 function showPanel(id) {
   $('panelAuth').classList.toggle('active', id === 'panelAuth');
   $('panelMain').classList.toggle('active', id === 'panelMain');
+  if (id === 'panelAuth') $('authServer').value = SERVER;
 }
 
 function setStatus(barId, textId, state, label) {
@@ -39,10 +43,13 @@ function toggleMode() {
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 async function submitAuth() {
+  const serverInput = ($('authServer').value || '').trim().replace(/\/$/, '');
+  if (serverInput) SERVER = serverInput;
   const email    = $('authEmail').value.trim();
   const password = $('authPassword').value;
   $('authErr').textContent = '';
 
+  if (!SERVER)   { $('authErr').textContent = 'Server URL is required.'; return; }
   if (!email)    { $('authErr').textContent = 'Email is required.'; return; }
   if (!password) { $('authErr').textContent = 'Password is required.'; return; }
 
@@ -56,10 +63,8 @@ async function submitAuth() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-
     let data;
-    try { data = await res.json(); }
-    catch { throw new Error(`Server error (${res.status})`); }
+    try { data = await res.json(); } catch { throw new Error(`Server error (${res.status})`); }
     if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
 
     await chrome.storage.local.set({ token: data.token, email: data.email, serverUrl: SERVER });
@@ -88,36 +93,11 @@ function logout() {
 
 async function loadMainPanel() {
   showPanel('panelMain');
-  const { token, email, scanLog = [] } =
-    await chrome.storage.local.get(['token', 'email', 'scanLog']);
-  $('userEmail').textContent = email || '';
-  refreshStatus(token);
-  loadClaims(token);
-  
-  // Fetch scan logs from server API for persistent storage
-  let serverLogs = [];
-  if (token) {
-    try {
-      const res = await fetch(`${SERVER}/api/logs`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        serverLogs = await res.json();
-        // Merge with local logs, removing duplicates by AWB
-        const merged = [...scanLog];
-        for (const log of serverLogs) {
-          if (!merged.some(l => l.awb === log.awb && l.ts === log.ts)) {
-            merged.push({ ...log, receivedAt: log.ts });
-          }
-        }
-        // Sort by timestamp descending
-        merged.sort((a, b) => (b.receivedAt || b.ts) - (a.receivedAt || a.ts));
-        renderLog(merged);
-        return;
-      }
-    } catch {}
-  }
-  renderLog(scanLog);
+  const data = await chrome.storage.local.get(['token', 'email', 'serverUrl']);
+  if (data.serverUrl) SERVER = data.serverUrl;
+  $('userEmail').textContent = data.email || '';
+  refreshStatus(data.token);
+  loadClaims(data.token);
 }
 
 async function refreshStatus(token) {
@@ -145,7 +125,7 @@ async function refreshStatus(token) {
 
     setStatus('extStatus', 'extStatusText',
       s.mobileConnected ? 'connected' : 'warning',
-      s.mobileConnected ? 'Phone: connected' : 'Phone: not connected'
+      s.mobileConnected ? 'Scanner: connected' : 'Scanner: not connected'
     );
   } catch {
     setStatus('wsStatus', 'wsStatusText', 'disconnected', 'Cannot reach server');
@@ -163,7 +143,6 @@ async function loadClaims(token) {
     });
     if (!res.ok) return;
     const claims = await res.json();
-    // Read locally tracked "filled" IDs so the UI stays accurate
     const { filledClaims = [] } = await chrome.storage.local.get(['filledClaims']);
     const filledSet = new Set(filledClaims);
     currentClaims = claims.map(c => ({ ...c, receivedAt: c.ts, filled: filledSet.has(c.claimId) }));
@@ -184,9 +163,9 @@ function renderClaims(queue) {
   }
 
   const pending = queue.filter(c => !c.filled);
-  badge.textContent    = pending.length || '';
-  badge.style.display  = pending.length ? 'inline-flex' : 'none';
-  clearBtn.style.display = 'block';
+  badge.textContent   = pending.length || '';
+  badge.style.display = pending.length ? 'inline-flex' : 'none';
+  clearBtn.style.display = queue.some(c => c.filled) ? 'block' : 'none';
 
   list.innerHTML = queue.map(c => {
     const fileCount = Object.keys(c.files || {}).length;
@@ -195,15 +174,19 @@ function renderClaims(queue) {
     if (c.packetId)    tags.push(`<span class="claim-tag">Pkt: ${c.packetId}</span>`);
     if (fileCount)     tags.push(`<span class="claim-tag files">${fileCount} file${fileCount > 1 ? 's' : ''}</span>`);
 
+    const canFill = fileCount > 0;
+    const btnStyle = canFill ? '' : 'opacity:0.5; pointer-events:none;';
+    const btnTitle = canFill ? 'Fill Form on Meesho' : 'Add media first (from scanner app)';
+
     return `
       <div class="claim-item${c.filled ? ' filled' : ''}">
         <div class="claim-header">
           <span class="claim-awb">${c.awb || '—'}</span>
           <span class="claim-time">${formatTime(c.receivedAt)}</span>
         </div>
-        ${tags.length ? `<div class="claim-tags">${tags.join('')}</div>` : ''}
-        <button class="btn btn-primary claim-fill-btn" data-claim-id="${c.claimId}">
-          ${c.filled ? '✓ Filled — Fill Again' : 'Fill Form →'}
+        ${tags.length ? `<div class="claim-tags">${tags.join('')}</div>` : '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">⚠️ Add photos in scanner app first</div>'}
+        <button class="claim-fill-btn" style="${btnStyle}" title="${btnTitle}" data-claim-id="${c.claimId}">
+          ${c.filled ? '✓ Filled — Fill Again' : canFill ? 'Fill Meesho Form →' : '⚠️ No media attached'}
         </button>
       </div>
     `;
@@ -211,21 +194,26 @@ function renderClaims(queue) {
 }
 
 async function fillClaim(claimId) {
-  // Always use the freshest claim data from server
-  const { token } = await new Promise(r => chrome.storage.local.get(['token'], r));
+  const { token } = await chrome.storage.local.get(['token']);
   let claim = currentClaims.find(c => c.claimId === claimId) || null;
 
-  // If local copy missing or has no files, fetch from server
-  if (!claim || !claim.files || !Object.keys(claim.files).length) {
-    try {
-      const res = await fetch(`${SERVER}/api/claims`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const all = await res.json();
-        claim = all.find(c => c.claimId === claimId) || claim;
-      }
-    } catch { }
+  // Fetch fresh claim from server
+  try {
+    const res = await fetch(`${SERVER}/api/claim/${claimId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) claim = await res.json();
+  } catch {}
+
+  // Verify claim has media
+  if (!claim?.files || Object.keys(claim.files).length === 0) {
+    // Show temporary message
+    const btn = document.querySelector(`[data-claim-id="${claimId}"]`);
+    if (btn) {
+      btn.textContent = '⚠️ Add photos in scanner app first';
+      setTimeout(() => { btn.textContent = 'Fill Meesho Form →'; }, 3000);
+    }
+    return;
   }
 
   chrome.tabs.query({ url: 'https://supplier.meesho.com/*' }, (tabs) => {
@@ -234,18 +222,21 @@ async function fillClaim(claimId) {
       chrome.storage.local.set({ pendingFillClaimId: claimId, pendingFillClaim: claim || null });
       return;
     }
-    chrome.tabs.sendMessage(tabs[0].id, { type: 'fill_claim', claimId, claim: claim || null }, () => {
-      if (chrome.runtime.lastError) {
+    chrome.tabs.sendMessage(tabs[0].id, { type: 'fill_claim', claimId, claim: claim || null }, (resp) => {
+      if (chrome.runtime.lastError || !resp?.ok) {
+        // Content script not ready — save pending and reload the tab
         chrome.storage.local.set({ pendingFillClaimId: claimId, pendingFillClaim: claim || null });
         chrome.tabs.reload(tabs[0].id);
+      } else {
+        // Successfully delivered — mark as filled
+        chrome.storage.local.get(['filledClaims'], ({ filledClaims = [] }) => {
+          if (!filledClaims.includes(claimId)) {
+            chrome.storage.local.set({ filledClaims: [...filledClaims, claimId] });
+          }
+        });
       }
     });
     chrome.tabs.update(tabs[0].id, { active: true });
-    chrome.storage.local.get(['filledClaims'], ({ filledClaims = [] }) => {
-      if (!filledClaims.includes(claimId)) {
-        chrome.storage.local.set({ filledClaims: [...filledClaims, claimId] });
-      }
-    });
   });
 }
 
@@ -253,29 +244,6 @@ function clearClaims() {
   chrome.storage.local.remove('filledClaims', () => {
     chrome.storage.local.get(['token'], ({ token }) => loadClaims(token));
   });
-}
-
-// ── Scan log ──────────────────────────────────────────────────────────────────
-
-function renderLog(log) {
-  const list = $('scanList');
-  if (!log || !log.length) {
-    list.innerHTML = '<div class="empty">No scans yet</div>';
-    return;
-  }
-  list.innerHTML = log.slice(0, 30).map(s => `
-    <div class="scan-item">
-      <div>
-        <div class="scan-awb">${s.awb}</div>
-        <div class="scan-time">${formatTime(s.receivedAt || s.ts)}</div>
-      </div>
-      <span class="scan-badge received">Received</span>
-    </div>
-  `).join('');
-}
-
-function clearLog() {
-  chrome.storage.local.remove('scanLog', () => renderLog([]));
 }
 
 // ── Manual search ─────────────────────────────────────────────────────────────
@@ -306,9 +274,9 @@ $('claimList').addEventListener('click', (e) => {
 $('authBtn').addEventListener('click', submitAuth);
 $('authToggle').addEventListener('click', toggleMode);
 $('logoutBtn').addEventListener('click', logout);
-$('clearLogBtn').addEventListener('click', clearLog);
 $('clearClaimsBtn').addEventListener('click', clearClaims);
 $('manualGoBtn').addEventListener('click', manualSearch);
+$('manualAWB').addEventListener('keydown', (e) => { if (e.key === 'Enter') manualSearch(); });
 
 $('openMeeshoBtn').addEventListener('click', () => {
   chrome.tabs.query({ url: 'https://supplier.meesho.com/*' }, (tabs) => {
@@ -324,24 +292,19 @@ $('openMeeshoBtn').addEventListener('click', () => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   if ($('panelAuth').classList.contains('active')) submitAuth();
-  else manualSearch();
 });
 
-// Refresh scan log live
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes.scanLog) renderLog(changes.scanLog.newValue || []);
-});
-
-// Poll status + claims every 5 s while popup is open
+// Poll status + claims every 6s while popup is open
 setInterval(() => {
   chrome.storage.local.get(['token'], ({ token }) => {
     if (token) { refreshStatus(token); loadClaims(token); }
   });
-}, 5000);
+}, 6000);
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
-chrome.storage.local.get(['token', 'email'], (data) => {
+chrome.storage.local.get(['token', 'email', 'serverUrl'], (data) => {
+  if (data.serverUrl) SERVER = data.serverUrl;
   if (data.token && data.email) loadMainPanel();
   else showPanel('panelAuth');
 });

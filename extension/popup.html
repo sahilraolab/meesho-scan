@@ -17,7 +17,10 @@
         <div class="brand-sub" id="authSubtitle">Sign in to your account</div>
       </div>
     </div>
-
+    <div class="field">
+      <label>Server URL</label>
+      <input type="url" id="authServer" placeholder="https://scanserver.techseventeen.com" autocomplete="off" />
+    </div>
     <div class="field">
       <label>Email</label>
       <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" />
@@ -26,9 +29,8 @@
       <label>Password</label>
       <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password" />
     </div>
-
-    <button class="btn btn-primary" id="authBtn">Sign In</button>
     <div class="err-text" id="authErr"></div>
+    <button class="btn btn-primary" id="authBtn">Sign In</button>
     <div class="toggle-link"><span id="authToggle">Don't have an account? Sign up</span></div>
   </div>
 
@@ -53,8 +55,19 @@
     </div>
     <div id="extStatus" class="status-bar warning">
       <span class="status-dot"></span>
-      <span id="extStatusText">Phone not connected</span>
+      <span id="extStatusText">Scanner not connected</span>
     </div>
+
+    <!-- Manual search -->
+    <div class="section-header">
+      <span class="section-title">Manual AWB Search</span>
+    </div>
+    <div class="manual-row">
+      <input type="text" id="manualAWB" placeholder="Enter AWB number…" autocomplete="off" />
+      <button class="btn btn-primary" id="manualGoBtn">Search</button>
+    </div>
+
+    <div class="sep"></div>
 
     <!-- Claims -->
     <div class="section-header">
@@ -64,27 +77,7 @@
     <div id="claimList" class="claim-list">
       <div class="empty">No pending claims</div>
     </div>
-    <button class="btn btn-ghost" id="clearClaimsBtn" style="display:none">Clear claims</button>
-
-    <div class="sep"></div>
-
-    <!-- Scan log -->
-    <div class="section-header">
-      <span class="section-title">Recent Scans</span>
-    </div>
-    <div id="scanList" class="scan-list">
-      <div class="empty">No scans yet</div>
-    </div>
-    <button class="btn btn-ghost" id="clearLogBtn">Clear log</button>
-
-    <div class="sep"></div>
-
-    <!-- Manual search -->
-    <div class="section-title">Manual Search</div>
-    <div class="manual-row">
-      <input type="text" id="manualAWB" placeholder="AWB number…" />
-      <button class="btn btn-primary" id="manualGoBtn">Go</button>
-    </div>
+    <button class="btn btn-ghost" id="clearClaimsBtn" style="display:none">Clear filled claims</button>
 
   </div>
 

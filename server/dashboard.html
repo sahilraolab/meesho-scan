@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meesho Scan — Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --pink: #f43397; --pink-dark: #c91f7a; --pink-light: #fce7f3;
+      --bg: #f8f9fb; --card: #fff; --text: #111827; --muted: #6b7280;
+      --border: #e5e7eb; --green: #16a34a; --red: #dc2626; --yellow: #d97706;
+      --blue: #2563eb;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+    header {
+      background: var(--pink); color: #fff; padding: 0 32px; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(244,51,151,.2);
+    }
+    .logo { font-weight: 800; font-size: 18px; }
+    .header-sub { font-size: 12px; opacity: .8; }
+    main { max-width: 1100px; margin: 0 auto; padding: 28px 20px; }
+    h2 { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px 22px; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .stat-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+    .stat-value { font-size: 32px; font-weight: 800; }
+    .stat-value.pink   { color: var(--pink); }
+    .stat-value.green  { color: var(--green); }
+    .stat-value.yellow { color: var(--yellow); }
+    .stat-value.blue   { color: var(--blue); }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 20px; }
+    .card-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 9px 12px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
+    td { padding: 11px 12px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg); }
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .badge.pending   { background: #fef3c7; color: var(--yellow); }
+    .badge.delivered { background: #dcfce7; color: var(--green); }
+    .badge.skipped   { background: #f3f4f6; color: var(--muted); }
+    .badge.claimed   { background: #dbeafe; color: var(--blue); }
+    .mono { font-family: monospace; font-weight: 600; }
+    .empty { text-align: center; color: var(--muted); padding: 32px; font-size: 13px; }
+    .filter-row { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; }
+    .filter-row input { border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 13px; outline: none; }
+    .filter-row input:focus { border-color: var(--pink); }
+    .btn { padding: 8px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: var(--pink); color: #fff; }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo">📦 Meesho Scan</div>
+    <div class="header-sub">Server Dashboard</div>
+  </div>
+</header>
+<main>
+  <h2>Overview</h2>
+  <div class="stats">
+    <div class="stat-card"><div class="stat-label">Total Scans</div><div class="stat-value pink" id="statScans">—</div></div>
+    <div class="stat-card"><div class="stat-label">Delivered to Ext.</div><div class="stat-value green" id="statDelivered">—</div></div>
+    <div class="stat-card"><div class="stat-label">Skipped</div><div class="stat-value yellow" id="statSkipped">—</div></div>
+    <div class="stat-card"><div class="stat-label">Total Claims</div><div class="stat-value blue" id="statClaims">—</div></div>
+    <div class="stat-card"><div class="stat-label">Pending Claims</div><div class="stat-value yellow" id="statPending">—</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Recent Scans</div>
+    <div class="filter-row">
+      <input type="date" id="startDate" />
+      <input type="date" id="endDate" />
+      <button class="btn btn-primary" onclick="loadReports()">Filter</button>
+    </div>
+    <table>
+      <thead><tr><th>AWB</th><th>Status</th><th>Time</th></tr></thead>
+      <tbody id="scansBody"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Recent Claims</div>
+    <table>
+      <thead><tr><th>AWB</th><th>Sub Order</th><th>Packet ID</th><th>Status</th><th>Time</th></tr></thead>
+      <tbody id="claimsBody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+const token = new URLSearchParams(location.search).get('token') || localStorage.getItem('dash_token');
+if (!token) { location.href = '/'; }
+
+function fmt(ts) {
+  return new Date(ts).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+async function loadReports() {
+  const start = document.getElementById('startDate').value;
+  const end   = document.getElementById('endDate').value;
+  let qs = '';
+  if (start) qs += `&start=${new Date(start).getTime()}`;
+  if (end)   qs += `&end=${new Date(end + 'T23:59:59').getTime()}`;
+
+  try {
+    const [scanRes, claimRes] = await Promise.all([
+      fetch('/api/reports/scans?1=1' + qs, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch('/api/reports/claims', { headers: { Authorization: `Bearer ${token}` } }),
+    ]);
+
+    if (scanRes.ok) {
+      const d = await scanRes.json();
+      document.getElementById('statScans').textContent     = d.total || 0;
+      document.getElementById('statDelivered').textContent = d.delivered || 0;
+      document.getElementById('statSkipped').textContent   = d.skipped || 0;
+
+      const scansBody = document.getElementById('scansBody');
+      const dates = Object.keys(d.byDate || {}).sort((a,b) => b.localeCompare(a));
+      if (!dates.length) { scansBody.innerHTML = '<tr><td colspan="3" class="empty">No scans in range</td></tr>'; }
+      else {
+        scansBody.innerHTML = dates.map(date => {
+          const r = d.byDate[date];
+          return `<tr><td class="mono">${date}</td><td><span class="badge delivered">${r.delivered} delivered</span> <span class="badge skipped">${r.skipped} skipped</span></td><td>${r.total} total</td></tr>`;
+        }).join('');
+      }
+    }
+
+    if (claimRes.ok) {
+      const d = await claimRes.json();
+      document.getElementById('statClaims').textContent  = d.total || 0;
+      document.getElementById('statPending').textContent = d.pending || 0;
+
+      const claimsBody = document.getElementById('claimsBody');
+      if (!d.claims?.length) { claimsBody.innerHTML = '<tr><td colspan="5" class="empty">No claims yet</td></tr>'; }
+      else {
+        claimsBody.innerHTML = d.claims.slice(0, 50).map(c => `
+          <tr>
+            <td class="mono">${c.awb || '—'}</td>
+            <td class="mono" style="font-size:12px">${c.subOrderNum || '—'}</td>
+            <td class="mono" style="font-size:12px">${c.packetId || '—'}</td>
+            <td><span class="badge ${c.status}">${c.status}</span></td>
+            <td style="color:var(--muted)">${fmt(c.ts)}</td>
+          </tr>
+        `).join('');
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+loadReports();
+</script>
+</body>
+</html>
