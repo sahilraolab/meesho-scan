@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meesho Scan — Barcode Scanner for Meesho Return Processing</title>
+  <meta name="description" content="Meesho Scan lets you scan return parcel barcodes on your phone and automatically search the AWB on the Meesho Returns page in your Chrome browser. Free for Meesho sellers." />
+  <meta name="keywords" content="Meesho returns, barcode scanner, AWB search, Meesho seller tool, return processing" />
+  <link rel="canonical" href="https://meesho.techseventeen.com" />
+
+  <!-- Open Graph -->
+  <meta property="og:type"        content="website" />
+  <meta property="og:url"         content="https://meesho.techseventeen.com" />
+  <meta property="og:title"       content="Meesho Scan — Barcode Scanner for Meesho Return Processing" />
+  <meta property="og:description" content="Scan return barcodes on your phone. AWB auto-fills in your browser instantly. Built for Meesho sellers." />
+  <meta property="og:image"       content="https://meesho.techseventeen.com/og-image.png" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:title"       content="Meesho Scan" />
+  <meta name="twitter:description" content="Scan return barcodes on your phone. AWB auto-fills in your browser instantly." />
+
+  <!-- Schema.org -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Meesho Scan",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Chrome, Android, iOS",
+    "description": "Scan return parcel barcodes on your phone and automatically search the AWB on the Meesho Returns page in Chrome.",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" }
+  }
+  </script>
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────────────────────── -->
+<header id="header">
+  <div class="container nav-inner">
+    <a class="nav-logo" href="#">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect width="22" height="22" rx="6" fill="#f43397"/><path d="M6 11h10M11 6l5 5-5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Meesho Scan
+    </a>
+    <nav class="nav-links" id="navLinks">
+      <a href="#how-it-works">How it works</a>
+      <a href="#install">Setup</a>
+      <a href="#features">Features</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a href="#install" class="btn btn-primary btn-sm nav-cta">Get Started</a>
+    <button class="hamburger" id="hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<!-- ── Hero ─────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="container hero-inner">
+    <div class="hero-eyebrow">Free for Meesho Sellers</div>
+    <h1>Scan Returns on Your Phone.<br><span class="gradient-text">Auto-Search in Chrome.</span></h1>
+    <p class="hero-sub">
+      Point your phone camera at any return parcel barcode — the AWB instantly appears in the Meesho Returns search on your desktop. No typing. No copy-paste.
+    </p>
+    <div class="hero-cta">
+      <a href="#install-extension" class="btn btn-primary btn-lg">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download Extension
+      </a>
+      <a href="#install-mobile" class="btn btn-outline btn-lg">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        Get Mobile App
+      </a>
+    </div>
+    <div class="hero-proof">
+      <div class="proof-item"><span class="proof-dot green"></span>Works with Chrome</div>
+      <div class="proof-dot-sep">·</div>
+      <div class="proof-item"><span class="proof-dot blue"></span>Android &amp; iPhone</div>
+      <div class="proof-dot-sep">·</div>
+      <div class="proof-item"><span class="proof-dot pink"></span>Real-time via WebSocket</div>
+      <div class="proof-dot-sep">·</div>
+      <div class="proof-item"><span class="proof-dot orange"></span>100% Free</div>
+    </div>
+
+    <!-- Device mockup -->
+    <div class="mockup-wrap">
+      <div class="mockup-phone">
+        <div class="mockup-phone-screen">
+          <div class="mock-header">
+            <div class="mock-logo">📦 Meesho Scan</div>
+            <div class="mock-status connected">● Connected</div>
+          </div>
+          <div class="mock-scanner">
+            <div class="mock-viewfinder">
+              <div class="mock-corner tl"></div>
+              <div class="mock-corner tr"></div>
+              <div class="mock-corner bl"></div>
+              <div class="mock-corner br"></div>
+              <div class="mock-scanline"></div>
+            </div>
+            <p class="mock-hint">Hold barcode steady inside the frame</p>
+          </div>
+          <div class="mock-last-scan">
+            <span class="mock-check">✅</span>
+            <div>
+              <div class="mock-awb">AWB123456789IN</div>
+              <div class="mock-meta">Sent to Extension • now</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mockup-arrow">
+        <svg width="48" height="24" viewBox="0 0 48 24" fill="none"><path d="M4 12h40M32 4l12 8-12 8" stroke="#f43397" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="mockup-arrow-label">Real-time</div>
+      </div>
+      <div class="mockup-browser">
+        <div class="mockup-browser-bar">
+          <div class="browser-dots"><span></span><span></span><span></span></div>
+          <div class="browser-url">supplier.meesho.com/returns</div>
+        </div>
+        <div class="mockup-browser-screen">
+          <div class="browser-search-wrap">
+            <div class="browser-search-label">Search by Order ID, SKU or AWB Number</div>
+            <div class="browser-search-input">
+              <span class="browser-search-icon">🔍</span>
+              <span class="browser-search-val typing">AWB123456789IN</span>
+              <span class="browser-cursor">|</span>
+            </div>
+          </div>
+          <div class="browser-result-row">
+            <div class="browser-result-badge">Return #7821</div>
+            <div class="browser-result-status">Processing</div>
+          </div>
+          <div class="browser-result-row dim">
+            <div class="browser-result-badge">Return #7820</div>
+            <div class="browser-result-status">Completed</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How it works ──────────────────────────────────────────────────────── -->
+<section class="section" id="how-it-works">
+  <div class="container">
+    <div class="section-header">
+      <div class="eyebrow">The Flow</div>
+      <h2>Three steps to zero typing</h2>
+      <p class="section-sub">Set it up once, use it every day.</p>
+    </div>
+
+    <div class="steps-row">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f43397" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <h3>Install the Extension</h3>
+        <p>Download and sideload the Meesho Scan Chrome extension in under a minute — no Chrome Web Store needed.</p>
+      </div>
+      <div class="step-connector"><div class="connector-line"></div></div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f43397" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        </div>
+        <h3>Add the Mobile App</h3>
+        <p>Open the app URL on your phone and tap "Add to Home Screen" — it installs as a native-like PWA, no app store required.</p>
+      </div>
+      <div class="step-connector"><div class="connector-line"></div></div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f43397" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <h3>Sign in &amp; Scan</h3>
+        <p>Log in with the same email and password on both devices. Scan any barcode — it auto-fills in your browser instantly.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Extension Install ─────────────────────────────────────────────────── -->
+<section class="section section-alt" id="install">
+  <div class="container">
+    <div class="section-header">
+      <div class="eyebrow">Step by Step</div>
+      <h2>Setup Guide</h2>
+      <p class="section-sub">Follow these steps once and you're done forever.</p>
+    </div>
+
+    <div class="install-grid">
+
+      <!-- Extension -->
+      <div class="install-block" id="install-extension">
+        <div class="install-block-header">
+          <div class="install-block-icon chrome-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#4285f4" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="#4285f4"/><path d="M12 8h8.66M7.07 14l-4.33 7.5M7.07 14l-4.33-7.5" stroke="#4285f4" stroke-width="2"/></svg>
+          </div>
+          <div>
+            <div class="install-block-label">Chrome Extension</div>
+            <h3>Install on your Desktop</h3>
+          </div>
+        </div>
+
+        <a href="https://scanserver.techseventeen.com/extension.zip" class="btn btn-primary download-btn" download>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download Extension ZIP
+        </a>
+
+        <ol class="install-steps">
+          <li>
+            <div class="install-step-num">1</div>
+            <div>Download the extension ZIP above and <strong>unzip it</strong> to a folder on your computer.</div>
+          </li>
+          <li>
+            <div class="install-step-num">2</div>
+            <div>Open Chrome and go to <code>chrome://extensions</code></div>
+          </li>
+          <li>
+            <div class="install-step-num">3</div>
+            <div>Toggle on <strong>Developer mode</strong> in the top-right corner.</div>
+          </li>
+          <li>
+            <div class="install-step-num">4</div>
+            <div>Click <strong>Load unpacked</strong> and select the unzipped <code>extension</code> folder.</div>
+          </li>
+          <li>
+            <div class="install-step-num">5</div>
+            <div>The <strong>📦 Meesho Scan</strong> icon will appear in your Chrome toolbar. Click it and sign in with your email and password.</div>
+          </li>
+        </ol>
+
+        <div class="install-tip">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          Keep the Meesho Returns page open at <strong>supplier.meesho.com/returns</strong> while scanning.
+        </div>
+      </div>
+
+      <!-- Mobile -->
+      <div class="install-block" id="install-mobile">
+        <div class="install-block-header">
+          <div class="install-block-icon phone-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f43397" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          </div>
+          <div>
+            <div class="install-block-label">Mobile App (PWA)</div>
+            <h3>Install on your Phone</h3>
+          </div>
+        </div>
+
+        <div class="qr-or-link">
+          <div class="app-url-display">
+            <span class="app-url-label">Open this URL on your phone:</span>
+            <code class="app-url">https://scanserver.techseventeen.com</code>
+          </div>
+        </div>
+
+        <div class="platform-tabs">
+          <button class="ptab active" data-tab="android">Android (Chrome)</button>
+          <button class="ptab" data-tab="ios">iPhone (Safari)</button>
+        </div>
+
+        <ol class="install-steps" id="tab-android">
+          <li>
+            <div class="install-step-num">1</div>
+            <div>Open <strong>Chrome</strong> on Android and navigate to the URL above.</div>
+          </li>
+          <li>
+            <div class="install-step-num">2</div>
+            <div>Tap the <strong>three-dot menu</strong> (⋮) in the top-right.</div>
+          </li>
+          <li>
+            <div class="install-step-num">3</div>
+            <div>Tap <strong>"Add to Home screen"</strong> and confirm.</div>
+          </li>
+          <li>
+            <div class="install-step-num">4</div>
+            <div>Open the app from your home screen, sign in, and allow camera permission.</div>
+          </li>
+        </ol>
+
+        <ol class="install-steps" id="tab-ios" style="display:none">
+          <li>
+            <div class="install-step-num">1</div>
+            <div>Open <strong>Safari</strong> on iPhone and navigate to the URL above.</div>
+          </li>
+          <li>
+            <div class="install-step-num">2</div>
+            <div>Tap the <strong>Share icon</strong> (box with arrow pointing up) at the bottom.</div>
+          </li>
+          <li>
+            <div class="install-step-num">3</div>
+            <div>Scroll down and tap <strong>"Add to Home Screen"</strong>.</div>
+          </li>
+          <li>
+            <div class="install-step-num">4</div>
+            <div>Open the app from your home screen, sign in, and allow camera permission.</div>
+          </li>
+        </ol>
+
+        <div class="install-tip">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          Use the <strong>same email and password</strong> on your phone and the extension.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Features ──────────────────────────────────────────────────────────── -->
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-header">
+      <div class="eyebrow">Features</div>
+      <h2>Built for daily warehouse use</h2>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon-wrap pink">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <h3>Real-time WebSocket</h3>
+        <p>Barcodes reach your browser in milliseconds over a persistent WebSocket connection.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap blue">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h3>Secure Auth</h3>
+        <p>JWT sessions with bcrypt-hashed passwords. One active session per account at a time.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap green">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        </div>
+        <h3>Multi-format Barcodes</h3>
+        <p>Supports Code 128, Code 39, EAN-13, ITF, QR Code and all common courier formats.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap orange">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <h3>Scan History</h3>
+        <p>Every scan is logged with timestamp on both the mobile app and the extension popup.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap purple">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        </div>
+        <h3>PWA — No App Store</h3>
+        <p>Installs directly from the browser. Works on Android and iPhone without any app store.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrap teal">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+        <h3>Manual Fallback</h3>
+        <p>Type any AWB manually in both the mobile app and the extension if the camera isn't available.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FAQ ───────────────────────────────────────────────────────────────── -->
+<section class="section section-alt" id="faq">
+  <div class="container">
+    <div class="section-header">
+      <div class="eyebrow">FAQ</div>
+      <h2>Common questions</h2>
+    </div>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary>Is this free to use?</summary>
+        <div class="faq-body"><p>Yes, completely free. There are no subscriptions, no hidden charges, and no limits on scans.</p></div>
+      </details>
+      <details class="faq-item">
+        <summary>Why isn't the extension on the Chrome Web Store?</summary>
+        <div class="faq-body"><p>The extension is privately distributed and installed via Chrome's built-in "Load unpacked" developer mode — a standard practice for internal tools. It takes less than a minute to install and works identically to a store extension.</p></div>
+      </details>
+      <details class="faq-item">
+        <summary>Does this work without internet?</summary>
+        <div class="faq-body"><p>The server needs to be reachable. If your server is hosted on a VPS, you need a working internet connection. The mobile app caches itself and works offline for basic use.</p></div>
+      </details>
+      <details class="faq-item">
+        <summary>What barcode formats are supported?</summary>
+        <div class="faq-body"><p>Code 128, Code 39, EAN-13, EAN-8, QR Code, ITF, UPC-A, UPC-E, and Data Matrix — all common formats used on courier return parcels.</p></div>
+      </details>
+      <details class="faq-item">
+        <summary>Can multiple people use the same account?</summary>
+        <div class="faq-body"><p>No — one mobile session and one extension session are allowed per account at a time. If you sign in from another device, the previous session is automatically disconnected. Create separate accounts for separate users.</p></div>
+      </details>
+      <details class="faq-item">
+        <summary>What if the barcode doesn't scan?</summary>
+        <div class="faq-body"><p>Use the manual input field below the camera view on the mobile app, or the manual search input in the extension popup. Type the AWB directly and press Enter.</p></div>
+      </details>
+      <details class="faq-item">
+        <summary>Is my data safe?</summary>
+        <div class="faq-body"><p>Your password is stored as a bcrypt hash — we never store plain text passwords. Sessions use signed JWT tokens. Scan data (AWB numbers) is stored only on your own server. See our <a href="privacy.html">Privacy Policy</a> for full details.</p></div>
+      </details>
+      <details class="faq-item">
+        <summary>What happens if the extension disconnects?</summary>
+        <div class="faq-body"><p>The extension and mobile app both reconnect automatically. If a scan arrives while the extension is offline, it shows as "pending" in the mobile app's scan history.</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA banner ────────────────────────────────────────────────────────── -->
+<section class="cta-banner">
+  <div class="container cta-banner-inner">
+    <div>
+      <h2>Ready to stop typing AWBs manually?</h2>
+      <p>Set it up in under 5 minutes. It's free.</p>
+    </div>
+    <div class="cta-banner-btns">
+      <a href="#install-extension" class="btn btn-white btn-lg">Download Extension</a>
+      <a href="#install-mobile"    class="btn btn-outline-white btn-lg">Get Mobile App</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ────────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a class="footer-logo" href="#">
+        <svg width="20" height="20" viewBox="0 0 22 22" fill="none"><rect width="22" height="22" rx="6" fill="#f43397"/><path d="M6 11h10M11 6l5 5-5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Meesho Scan
+      </a>
+      <p class="footer-tagline">Built for Meesho sellers. Scan smarter.</p>
+    </div>
+    <div class="footer-links">
+      <div class="footer-col">
+        <div class="footer-col-title">Product</div>
+        <a href="#how-it-works">How it works</a>
+        <a href="#install">Setup Guide</a>
+        <a href="#features">Features</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div class="footer-col">
+        <div class="footer-col-title">Legal</div>
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms &amp; Conditions</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">
+      <span>&copy; <span id="year"></span> Meesho Scan. All rights reserved.</span>
+      <span>Not affiliated with Meesho Internet Pvt Ltd.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Year
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  // Sticky header shadow
+  const header = document.getElementById('header');
+  window.addEventListener('scroll', () => {
+    header.classList.toggle('scrolled', window.scrollY > 10);
+  }, { passive: true });
+
+  // Hamburger
+  const hamburger = document.getElementById('hamburger');
+  const navLinks  = document.getElementById('navLinks');
+  hamburger.addEventListener('click', () => {
+    navLinks.classList.toggle('open');
+    hamburger.classList.toggle('open');
+  });
+  navLinks.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+      navLinks.classList.remove('open');
+      hamburger.classList.remove('open');
+    });
+  });
+
+  // Platform tabs
+  document.querySelectorAll('.ptab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const target = tab.dataset.tab;
+      document.getElementById('tab-android').style.display = target === 'android' ? 'flex' : 'none';
+      document.getElementById('tab-ios').style.display     = target === 'ios'     ? 'flex' : 'none';
+    });
+  });
+
+  // Smooth scroll for anchor links
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const id = a.getAttribute('href').slice(1);
+      const el = document.getElementById(id);
+      if (!el) return;
+      e.preventDefault();
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  // Fade-in on scroll
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.step-card, .feature-card, .install-block, .faq-item').forEach(el => {
+    el.classList.add('fade-in');
+    observer.observe(el);
+  });
+</script>
+</body>
+</html>
