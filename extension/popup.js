@@ -93,9 +93,17 @@ function logout() {
 
 async function loadMainPanel() {
   showPanel('panelMain');
-  const data = await chrome.storage.local.get(['token', 'email', 'serverUrl']);
+  const data = await chrome.storage.local.get(['token', 'email', 'serverUrl', 'claimUrls']);
   if (data.serverUrl) SERVER = data.serverUrl;
   $('userEmail').textContent = data.email || '';
+  const urls = data.claimUrls || {};
+  $('urlWrongReturn').value   = urls.wrong_return   || '';
+  $('urlDamagedReturn').value = urls.damaged_return || '';
+  $('urlMissingItems').value  = urls.missing_items  || '';
+  $('urlUsedProduct').value   = urls.used_product   || '';
+  if (Object.values(urls).some(v => v)) {
+    $('claimUrlsStatus').textContent = '✓ Saved';
+  }
   refreshStatus(data.token);
   loadClaims(data.token);
 }
@@ -207,7 +215,6 @@ async function fillClaim(claimId) {
 
   // Verify claim has media
   if (!claim?.files || Object.keys(claim.files).length === 0) {
-    // Show temporary message
     const btn = document.querySelector(`[data-claim-id="${claimId}"]`);
     if (btn) {
       btn.textContent = '⚠️ Add photos in scanner app first';
@@ -216,27 +223,48 @@ async function fillClaim(claimId) {
     return;
   }
 
-  chrome.tabs.query({ url: 'https://supplier.meesho.com/*' }, (tabs) => {
-    if (!tabs.length) {
-      chrome.tabs.create({ url: 'https://supplier.meesho.com/returns' });
-      chrome.storage.local.set({ pendingFillClaimId: claimId, pendingFillClaim: claim || null });
-      return;
-    }
-    chrome.tabs.sendMessage(tabs[0].id, { type: 'fill_claim', claimId, claim: claim || null }, (resp) => {
-      if (chrome.runtime.lastError || !resp?.ok) {
-        // Content script not ready — save pending and reload the tab
-        chrome.storage.local.set({ pendingFillClaimId: claimId, pendingFillClaim: claim || null });
-        chrome.tabs.reload(tabs[0].id);
+  const { claimUrls = {} } = await chrome.storage.local.get(['claimUrls']);
+  const targetUrl = claimUrls[claim.claimType || 'wrong_return'];
+
+  if (targetUrl) {
+    // Direct navigate to the saved form URL — content script fills the form on arrival
+    chrome.storage.local.set({ pendingFillClaim: claim });
+    chrome.tabs.query({ url: 'https://supplier.meesho.com/*' }, (tabs) => {
+      if (!tabs.length) {
+        chrome.tabs.create({ url: targetUrl });
       } else {
-        // Successfully delivered — mark as filled
-        chrome.storage.local.get(['filledClaims'], ({ filledClaims = [] }) => {
-          if (!filledClaims.includes(claimId)) {
-            chrome.storage.local.set({ filledClaims: [...filledClaims, claimId] });
-          }
-        });
+        chrome.tabs.update(tabs[0].id, { url: targetUrl, active: true });
       }
     });
-    chrome.tabs.update(tabs[0].id, { active: true });
+  } else {
+    // Fallback: send fill_claim message to current Meesho tab
+    chrome.tabs.query({ url: 'https://supplier.meesho.com/*' }, (tabs) => {
+      if (!tabs.length) {
+        chrome.tabs.create({ url: 'https://supplier.meesho.com/returns' });
+        chrome.storage.local.set({ pendingFillClaimId: claimId, pendingFillClaim: claim || null });
+        return;
+      }
+      chrome.tabs.sendMessage(tabs[0].id, { type: 'fill_claim', claimId, claim: claim || null }, (resp) => {
+        if (chrome.runtime.lastError || !resp?.ok) {
+          chrome.storage.local.set({ pendingFillClaimId: claimId, pendingFillClaim: claim || null });
+          chrome.tabs.reload(tabs[0].id);
+        } else {
+          chrome.storage.local.get(['filledClaims'], ({ filledClaims = [] }) => {
+            if (!filledClaims.includes(claimId)) {
+              chrome.storage.local.set({ filledClaims: [...filledClaims, claimId] });
+            }
+          });
+        }
+      });
+      chrome.tabs.update(tabs[0].id, { active: true });
+    });
+  }
+
+  // Mark as filled locally
+  chrome.storage.local.get(['filledClaims'], ({ filledClaims = [] }) => {
+    if (!filledClaims.includes(claimId)) {
+      chrome.storage.local.set({ filledClaims: [...filledClaims, claimId] });
+    }
   });
 }
 
@@ -300,6 +328,24 @@ setInterval(() => {
     if (token) { refreshStatus(token); loadClaims(token); }
   });
 }, 6000);
+
+$('saveClaimUrlsBtn').addEventListener('click', () => {
+  const urls = {
+    wrong_return:   $('urlWrongReturn').value.trim(),
+    damaged_return: $('urlDamagedReturn').value.trim(),
+    missing_items:  $('urlMissingItems').value.trim(),
+    used_product:   $('urlUsedProduct').value.trim(),
+  };
+  chrome.storage.local.set({ claimUrls: urls }, () => {
+    $('claimUrlsStatus').style.color = 'var(--green)';
+    $('claimUrlsStatus').textContent = '✓ Saved';
+    setTimeout(() => { $('claimUrlsStatus').textContent = ''; }, 2000);
+  });
+});
+
+['urlWrongReturn','urlDamagedReturn','urlMissingItems','urlUsedProduct'].forEach(id => {
+  $(id).addEventListener('input', () => { $('claimUrlsStatus').textContent = ''; });
+});
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 

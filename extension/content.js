@@ -210,7 +210,7 @@
   }
 
   async function fillClaimForm(claim) {
-    const { claimId, awb, subOrderNum, packetId, files } = claim;
+    const { claimId, awb, subOrderNum, packetId, files, packetState } = claim;
     showNotif('🎫 Filling claim form…');
 
     try {
@@ -239,6 +239,51 @@
           const option = document.querySelector('[role="option"]');
           if (option) option.click();
           await sleep(300);
+        }
+      }
+
+      // Fill "State of the packet" dropdown
+      if (packetState) {
+        const targetLabel = packetState === 'tampered' ? 'Tampered' : 'Intact';
+
+        // Find container via stable .dropdown_label class
+        let container = null;
+        for (const lbl of document.querySelectorAll('.dropdown_label, [class*="dropdown_label"]')) {
+          if (lbl.textContent.includes('State of the packet')) {
+            container = lbl.closest('.css-79elbk') || lbl.parentElement?.parentElement;
+            break;
+          }
+        }
+        // Fallback: search all css-79elbk boxes by text content
+        if (!container) {
+          for (const box of document.querySelectorAll('.css-79elbk')) {
+            if (box.textContent.includes('State of the packet')) { container = box; break; }
+          }
+        }
+
+        if (container) {
+          // Click first child (the header row, regardless of emotion class)
+          const header = container.firstElementChild;
+          if (header) { header.click(); await sleep(400); }
+
+          // Options appear dynamically — poll for up to 3s
+          let optList = null;
+          for (let i = 0; i < 15; i++) {
+            optList = container.querySelector('.css-iy3o0x') || document.querySelector('.css-iy3o0x');
+            if (optList) break;
+            await sleep(200);
+          }
+
+          if (optList) {
+            for (const p of optList.querySelectorAll('p')) {
+              if (p.textContent.trim() === targetLabel) {
+                p.click();
+                await sleep(200);
+                showNotif(`✅ Packet state: ${targetLabel}`);
+                break;
+              }
+            }
+          }
         }
       }
 
@@ -379,14 +424,33 @@
 
   function checkPendingFillClaim() {
     chrome.storage.local.get(['pendingFillClaimId', 'pendingFillClaim'], (data) => {
-      if (!data.pendingFillClaimId) return;
-      const claim = data.pendingFillClaim || null;
+      if (!data.pendingFillClaimId && !data.pendingFillClaim) return;
+      const claim   = data.pendingFillClaim || null;
+      const claimId = data.pendingFillClaimId;
       chrome.storage.local.remove(['pendingFillClaimId', 'pendingFillClaim'], async () => {
         await sleep(2000);
         if (claim) await fillClaimForm(claim);
-        else await fillClaimById(data.pendingFillClaimId);
+        else await fillClaimById(claimId);
       });
     });
+  }
+
+  // Navigate to the saved per-type claim URL, storing claim for form-fill on arrival.
+  // Falls back to direct fill if no URL is configured for the claim type.
+  async function fillClaimOrNavigate(claim) {
+    if (!alive) return;
+    try {
+      const { claimUrls = {} } = await chromeGet(['claimUrls']);
+      const targetUrl = claimUrls[claim.claimType || 'wrong_return'];
+      if (targetUrl) {
+        await new Promise(r => chrome.storage.local.set({ pendingFillClaim: claim }, r));
+        window.location.href = targetUrl;
+      } else {
+        await fillClaimForm(claim);
+      }
+    } catch (err) {
+      showNotif(`❌ Fill error: ${err.message}`, true);
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -407,30 +471,52 @@
   }
 
   // ── Floating indicator + panel ─────────────────────────────────────────────
-  // Clicking the indicator toggles a mini extension-like panel on the page.
 
-  let indicator = null;
+  let indicator    = null;
+  let indicatorState = 'disconnected';
+
+  const CLAIM_TYPE_META = {
+    wrong_return:   { label: 'Wrong Return',   color: '#d97706', bg: '#fef3c7' },
+    damaged_return: { label: 'Damaged',        color: '#dc2626', bg: '#fee2e2' },
+    missing_items:  { label: 'Missing Items',  color: '#2563eb', bg: '#dbeafe' },
+    used_product:   { label: 'Used Product',   color: '#7c3aed', bg: '#ede9fe' },
+  };
 
   function createIndicator() {
     indicator = document.createElement('div');
     indicator.id = '__ms_indicator__';
     Object.assign(indicator.style, {
-      position: 'fixed', bottom: '16px', right: '16px', zIndex: '2147483647',
-      background: '#fff', border: '1.5px solid #e5e5e5', borderRadius: '24px',
-      padding: '7px 14px', fontSize: '12px', fontFamily: 'system-ui, sans-serif',
-      fontWeight: '600', color: '#666', boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
-      display: 'flex', alignItems: 'center', gap: '7px',
-      cursor: 'pointer', userSelect: 'none', transition: 'box-shadow 0.2s',
+      position: 'fixed', bottom: '20px', right: '20px', zIndex: '2147483647',
+      background: '#fff', borderRadius: '28px',
+      padding: '0', width: '44px', height: '44px',
+      boxShadow: '0 2px 16px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.06)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'pointer', userSelect: 'none',
+      transition: 'box-shadow 0.2s, transform 0.15s',
+      fontFamily: 'system-ui, sans-serif',
+    });
+    indicator.addEventListener('mouseenter', () => {
+      indicator.style.boxShadow = '0 4px 24px rgba(244,51,151,0.25), 0 0 0 1px rgba(244,51,151,0.2)';
+      indicator.style.transform = 'scale(1.05)';
+    });
+    indicator.addEventListener('mouseleave', () => {
+      indicator.style.boxShadow = '0 2px 16px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.06)';
+      indicator.style.transform = 'scale(1)';
     });
     indicator.addEventListener('click', toggleFloatPanel);
     document.body.appendChild(indicator);
   }
 
-  function setIndicator(state, label) {
+  function setIndicator(state, _label) {
     if (!indicator) createIndicator();
-    const colors = { connected: '#16a34a', disconnected: '#d97706', error: '#dc2626' };
-    const dot = colors[state] || colors.disconnected;
-    indicator.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${dot};display:inline-block;flex-shrink:0;"></span>${label || 'Meesho Scan'}`;
+    indicatorState = state;
+    const dotColor = state === 'connected' ? '#16a34a' : state === 'error' ? '#dc2626' : '#d97706';
+    indicator.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+        <span style="font-size:20px;line-height:1;">📦</span>
+        <span style="width:6px;height:6px;border-radius:50%;background:${dotColor};display:block;"></span>
+      </div>`;
+    indicator.title = _label || 'Meesho Scan';
   }
 
   function toggleFloatPanel() {
@@ -438,41 +524,64 @@
     floatVisible = !floatVisible;
     floatPanel.style.display = floatVisible ? 'flex' : 'none';
     if (floatVisible) updateFloatPanel();
+    // Highlight indicator when panel is open
+    indicator.style.background = floatVisible ? '#f43397' : '#fff';
+    indicator.style.boxShadow  = floatVisible
+      ? '0 4px 20px rgba(244,51,151,0.35)' : '0 2px 16px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.06)';
   }
 
   function createFloatPanel() {
     floatPanel = document.createElement('div');
     floatPanel.id = '__ms_panel__';
     Object.assign(floatPanel.style, {
-      position: 'fixed', bottom: '56px', right: '16px', zIndex: '2147483647',
-      background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '14px',
-      width: '300px', maxHeight: '480px', overflowY: 'auto',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+      position: 'fixed', bottom: '72px', right: '20px', zIndex: '2147483647',
+      background: '#fff', borderRadius: '16px',
+      width: '320px', maxHeight: '540px', overflowY: 'auto',
+      boxShadow: '0 12px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)',
       flexDirection: 'column', padding: '0',
-      fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#111827',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: '13px', color: '#111827',
       display: 'none',
     });
 
     floatPanel.innerHTML = `
-      <div style="padding:12px 14px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between;">
-        <span style="font-weight:700; font-size:14px;">📦 Meesho Scan</span>
-        <span id="__ms_close__" style="cursor:pointer; color:#9ca3af; font-size:18px; line-height:1;">×</span>
-      </div>
-      <div style="padding:12px 14px;">
-        <div id="__ms_status_ext__" style="padding:8px 10px; border-radius:7px; font-size:12px; font-weight:500; margin-bottom:8px; background:#fef3c7; color:#d97706;">⚡ Checking…</div>
-        <div id="__ms_status_mob__" style="padding:8px 10px; border-radius:7px; font-size:12px; font-weight:500; margin-bottom:12px; background:#fef3c7; color:#d97706;">📱 Scanner: —</div>
-        
-        <div style="font-weight:700; font-size:12px; margin-bottom:8px; color:#374151;">Manual AWB Search</div>
-        <div style="display:flex; gap:6px; margin-bottom:12px;">
-          <input id="__ms_awb_input__" type="text" placeholder="Enter AWB…" style="flex:1; border:1.5px solid #e5e7eb; border-radius:7px; padding:8px 10px; font-size:13px; outline:none; font-family:monospace;" />
-          <button id="__ms_awb_go__" style="background:#f43397; color:#fff; border:none; border-radius:7px; padding:8px 12px; font-size:12px; font-weight:600; cursor:pointer;">Go</button>
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#f43397,#e11d77); padding:14px 16px; border-radius:16px 16px 0 0; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">📦</span>
+          <span style="font-weight:700; font-size:14px; color:#fff; letter-spacing:-0.3px;">Meesho Scan</span>
         </div>
+        <button id="__ms_close__" style="background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1;">×</button>
+      </div>
 
-        <div style="border-top:1px solid #e5e7eb; padding-top:12px;">
-          <div style="font-weight:700; font-size:12px; margin-bottom:8px; color:#374151;">Pending Claims</div>
-          <div id="__ms_claims_list__" style="display:flex; flex-direction:column; gap:6px;">
-            <div style="color:#9ca3af; font-size:12px;">Loading…</div>
-          </div>
+      <!-- Status row -->
+      <div style="padding:10px 14px 0; display:flex; gap:6px; flex-shrink:0;">
+        <div id="__ms_status_ext__" style="flex:1;display:flex;align-items:center;gap:5px;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:600;background:#fef3c7;color:#d97706;">
+          <span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;"></span>Tab
+        </div>
+        <div id="__ms_status_mob__" style="flex:1;display:flex;align-items:center;gap:5px;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:600;background:#fef3c7;color:#d97706;">
+          <span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;"></span>Scanner
+        </div>
+      </div>
+
+      <!-- AWB Search -->
+      <div style="padding:10px 14px 0; flex-shrink:0;">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Manual AWB Search</div>
+        <div style="display:flex; gap:6px;">
+          <input id="__ms_awb_input__" type="text" placeholder="Enter AWB number…"
+            style="flex:1;border:1.5px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;font-family:monospace;background:#f9fafb;color:#111827;" />
+          <button id="__ms_awb_go__"
+            style="background:#f43397;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
+            Search
+          </button>
+        </div>
+      </div>
+
+      <!-- Claims -->
+      <div style="padding:10px 14px 14px; flex:1; overflow-y:auto;">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Pending Claims</div>
+        <div id="__ms_claims_list__" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="color:#9ca3af;font-size:12px;text-align:center;padding:12px 0;">Loading…</div>
         </div>
       </div>
     `;
@@ -483,10 +592,17 @@
       e.stopPropagation();
       floatVisible = false;
       floatPanel.style.display = 'none';
+      if (indicator) {
+        indicator.style.background = '#fff';
+        indicator.style.boxShadow  = '0 2px 16px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.06)';
+      }
     });
 
     const goBtn = floatPanel.querySelector('#__ms_awb_go__');
     const awbIn = floatPanel.querySelector('#__ms_awb_input__');
+    const awbInput = floatPanel.querySelector('#__ms_awb_input__');
+    awbInput.addEventListener('focus', () => { awbInput.style.borderColor = '#f43397'; });
+    awbInput.addEventListener('blur',  () => { awbInput.style.borderColor = '#e5e7eb'; });
     const doSearch = () => {
       const awb = awbIn.value.trim().toUpperCase();
       if (!awb) return;
@@ -500,7 +616,7 @@
   async function updateFloatPanel() {
     if (!floatPanel || !floatVisible) return;
     try {
-      const { token: tok, serverUrl: srv } = await chromeGet(['token', 'serverUrl']);
+      const { token: tok, serverUrl: srv, claimUrls = {} } = await chromeGet(['token', 'serverUrl', 'claimUrls']);
       if (!tok || !srv) return;
 
       const base = (srv || '').replace(/\/$/, '');
@@ -514,51 +630,72 @@
         const extEl = floatPanel.querySelector('#__ms_status_ext__');
         const mobEl = floatPanel.querySelector('#__ms_status_mob__');
         if (extEl) {
-          extEl.textContent = s.extensionConnected ? '✅ Meesho tab: Active' : '⚠️ Meesho tab not open';
-          extEl.style.background = s.extensionConnected ? '#dcfce7' : '#fef3c7';
-          extEl.style.color      = s.extensionConnected ? '#16a34a' : '#d97706';
+          const ok = s.extensionConnected;
+          extEl.style.background = ok ? '#dcfce7' : '#fef3c7';
+          extEl.style.color      = ok ? '#16a34a' : '#d97706';
+          extEl.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;"></span>${ok ? 'Tab: Active' : 'Tab: Offline'}`;
         }
         if (mobEl) {
-          mobEl.textContent = s.mobileConnected ? '📱 Scanner: Connected' : '📱 Scanner: Not connected';
-          mobEl.style.background = s.mobileConnected ? '#dcfce7' : '#fef3c7';
-          mobEl.style.color      = s.mobileConnected ? '#16a34a' : '#d97706';
+          const ok = s.mobileConnected;
+          mobEl.style.background = ok ? '#dcfce7' : '#fef3c7';
+          mobEl.style.color      = ok ? '#16a34a' : '#d97706';
+          mobEl.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;"></span>${ok ? 'Scanner: On' : 'Scanner: Off'}`;
         }
       }
 
       if (claimsRes.ok) {
         const claims = await claimsRes.json();
         const list = floatPanel.querySelector('#__ms_claims_list__');
-        if (list) {
-          if (!claims.length) {
-            list.innerHTML = '<div style="color:#9ca3af; font-size:12px; text-align:center; padding:8px 0;">No pending claims</div>';
-          } else {
-            list.innerHTML = claims.slice(0, 5).map(c => {
-              const fileCount = Object.keys(c.files || {}).length;
-              const canFill = fileCount > 0;
-              return `<div style="background:#f8f9fb; border:1.5px solid #e5e7eb; border-radius:9px; padding:10px 12px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                  <span style="font-weight:700; font-family:monospace; font-size:13px;">${c.awb || '—'}</span>
-                  <span style="font-size:10px; color:#9ca3af;">${new Date(c.ts).toLocaleDateString()}</span>
-                </div>
-                ${c.subOrderNum ? `<div style="font-size:11px; color:#6b7280; margin-bottom:6px;">Sub: ${c.subOrderNum}</div>` : ''}
-                <button data-claim-id="${c.claimId}" style="
-                  width:100%; padding:5px 8px; border:none; border-radius:6px;
-                  background:${canFill ? '#f43397' : '#d1d5db'}; color:${canFill ? '#fff' : '#9ca3af'};
-                  font-size:11px; font-weight:600; cursor:${canFill ? 'pointer' : 'default'};
-                ">${canFill ? 'Fill Meesho Form →' : '⚠️ Add media in scanner app'}</button>
-              </div>`;
-            }).join('');
-            // Bind fill buttons
-            list.querySelectorAll('[data-claim-id]').forEach(btn => {
-              btn.addEventListener('click', async () => {
-                const claimId = btn.dataset.claimId;
-                const claim = claims.find(c => c.claimId === claimId);
-                if (!claim || Object.keys(claim.files || {}).length === 0) return;
-                if (claim) await fillClaimForm(claim);
-              });
-            });
-          }
+        if (!list) return;
+
+        if (!claims.length) {
+          list.innerHTML = '<div style="color:#9ca3af;font-size:12px;text-align:center;padding:16px 0;">No pending claims</div>';
+          return;
         }
+
+        list.innerHTML = claims.slice(0, 6).map(c => {
+          const fileCount = Object.keys(c.files || {}).length;
+          const canFill   = fileCount > 0;
+          const meta      = CLAIM_TYPE_META[c.claimType] || { label: 'Claim', color: '#6b7280', bg: '#f3f4f6' };
+          const hasUrl    = !!claimUrls[c.claimType || 'wrong_return'];
+          const packetLabel = c.packetState === 'tampered' ? '⚠️ Tampered' : c.packetState === 'intact' ? '✅ Intact' : '';
+
+          const fillLabel = !canFill
+            ? '⚠️ No media'
+            : !hasUrl
+            ? 'Fill Form (set URL first)'
+            : 'Fill Form →';
+          const fillBg    = !canFill ? '#d1d5db' : '#f43397';
+          const fillColor = !canFill ? '#9ca3af' : '#fff';
+          const fillCursor = canFill ? 'pointer' : 'default';
+
+          return `<div style="background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:10px;padding:10px 12px;transition:border-color 0.15s;" data-card-id="${c.claimId}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+              <span style="font-weight:700;font-family:monospace;font-size:13px;color:#111827;">${c.awb || '—'}</span>
+              <span style="font-size:10px;color:#9ca3af;white-space:nowrap;margin-left:6px;">${new Date(c.ts).toLocaleDateString()}</span>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+              <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:${meta.bg};color:${meta.color};">${meta.label}</span>
+              ${packetLabel ? `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:#f3f4f6;color:#374151;">${packetLabel}</span>` : ''}
+              ${c.subOrderNum ? `<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#f3f4f6;color:#6b7280;font-family:monospace;">Sub: ${c.subOrderNum}</span>` : ''}
+              ${fileCount ? `<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#ede9fe;color:#7c3aed;">📎 ${fileCount}</span>` : ''}
+            </div>
+            <button data-claim-id="${c.claimId}" style="width:100%;padding:6px;border:none;border-radius:7px;background:${fillBg};color:${fillColor};font-size:11px;font-weight:700;cursor:${fillCursor};letter-spacing:0.2px;">${fillLabel}</button>
+          </div>`;
+        }).join('');
+
+        list.querySelectorAll('[data-card-id]').forEach(card => {
+          card.addEventListener('mouseenter', () => { card.style.borderColor = '#f43397'; });
+          card.addEventListener('mouseleave', () => { card.style.borderColor = '#e5e7eb'; });
+        });
+
+        list.querySelectorAll('[data-claim-id]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const claim = claims.find(c => c.claimId === btn.dataset.claimId);
+            if (!claim || Object.keys(claim.files || {}).length === 0) return;
+            await fillClaimOrNavigate(claim);
+          });
+        });
       }
     } catch {}
   }

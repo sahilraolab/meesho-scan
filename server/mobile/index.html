@@ -490,6 +490,27 @@
       font-variant-numeric: tabular-nums;
     }
 
+    /* ── Claim type / packet state selection buttons ── */
+    .selection-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+    .selection-btn {
+      padding: 12px 10px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+      line-height: 1.4;
+    }
+    .selection-btn:hover { border-color: var(--pink); color: var(--pink); background: var(--pink-light); }
+    .selection-btn.selected { border-color: var(--pink); background: var(--pink-light); color: var(--pink); }
+    .packet-state-row { display: flex; gap: 10px; margin-bottom: 18px; }
+    .packet-state-row .selection-btn { flex: 1; }
+    .selection-label { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+
     /* ── Scan history ── */
     .scan-table { width: 100%; border-collapse: collapse; font-size: 14px; }
     .scan-table th { text-align: left; padding: 10px 14px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
@@ -737,12 +758,17 @@
           <div class="step-line" id="line1"></div>
           <div class="step" id="step2">
             <div class="step-num">2</div>
-            <div class="step-label">Scan Packet ID</div>
+            <div class="step-label">Packet ID</div>
           </div>
           <div class="step-line" id="line2"></div>
           <div class="step" id="step3">
             <div class="step-num">3</div>
-            <div class="step-label">Save Claim</div>
+            <div class="step-label">Claim Details</div>
+          </div>
+          <div class="step-line" id="line3"></div>
+          <div class="step" id="step4">
+            <div class="step-num">4</div>
+            <div class="step-label">Save</div>
           </div>
         </div>
 
@@ -792,16 +818,54 @@
           </div>
           <div class="btn-row" style="margin-top:6px">
             <button class="btn btn-secondary" onclick="goClaimStep1()">← Back</button>
-            <button class="btn btn-primary" onclick="goClaimStep3()">Next: Save Claim →</button>
+            <button class="btn btn-primary" onclick="goClaimStep3()">Next: Claim Details →</button>
           </div>
         </div>
 
-        <!-- Step 3: Save -->
+        <!-- Step 3: Claim type + packet state -->
         <div id="addStep3" class="card" style="display:none">
+          <div class="card-title">Claim Details</div>
+
+          <div class="selection-label">What is the issue with this return?</div>
+          <div class="selection-grid">
+            <button class="selection-btn" data-type="wrong_return" onclick="selectClaimType('wrong_return')">
+              🔄 Wrong Return
+            </button>
+            <button class="selection-btn" data-type="damaged_return" onclick="selectClaimType('damaged_return')">
+              💢 Damaged Return
+            </button>
+            <button class="selection-btn" data-type="missing_items" onclick="selectClaimType('missing_items')">
+              📦 Missing Items
+            </button>
+            <button class="selection-btn" data-type="used_product" onclick="selectClaimType('used_product')">
+              ♻️ Used Product
+            </button>
+          </div>
+
+          <div class="selection-label">State of the packet</div>
+          <div class="packet-state-row">
+            <button class="selection-btn" data-state="intact" onclick="selectPacketState('intact')">
+              ✅ Intact
+            </button>
+            <button class="selection-btn" data-state="tampered" onclick="selectPacketState('tampered')">
+              ⚠️ Tampered
+            </button>
+          </div>
+
+          <div class="btn-row" style="margin-top:6px">
+            <button class="btn btn-secondary" onclick="goClaimStep2()">← Back</button>
+            <button class="btn btn-primary" id="step3NextBtn" onclick="goClaimStep4()" disabled>Next: Confirm →</button>
+          </div>
+        </div>
+
+        <!-- Step 4: Save -->
+        <div id="addStep4" class="card" style="display:none">
           <div class="card-title">Confirm & Save Claim</div>
           <div class="info-row"><span class="info-label">AWB</span><span class="info-val" id="confirmAwb">—</span></div>
           <div class="info-row"><span class="info-label">Sub Order ID</span><span class="info-val" id="confirmSubOrder">—</span></div>
           <div class="info-row"><span class="info-label">Packet ID</span><span class="info-val" id="confirmPacketId">—</span></div>
+          <div class="info-row"><span class="info-label">Claim Type</span><span class="info-val" id="confirmClaimType">—</span></div>
+          <div class="info-row"><span class="info-label">Packet State</span><span class="info-val" id="confirmPacketState">—</span></div>
           <div class="info-row">
             <span class="info-label">Claim Window</span>
             <div id="claimDaysBadge"></div>
@@ -810,7 +874,7 @@
             This claim will be saved with <strong>Pending</strong> status. You can add photos and videos from the Claims screen later to file it with Meesho.
           </p>
           <div class="btn-row" style="margin-top:10px">
-            <button class="btn btn-secondary" onclick="goClaimStep2()">← Back</button>
+            <button class="btn btn-secondary" onclick="goClaimStep3()">← Back</button>
             <button class="btn btn-success btn-full" id="savClaimBtn" onclick="saveClaim()">💾 Save Claim</button>
           </div>
         </div>
@@ -831,6 +895,8 @@
           <div class="info-row"><span class="info-label">AWB</span><span class="info-val" id="detailAwb">—</span></div>
           <div class="info-row"><span class="info-label">Sub Order ID</span><span class="info-val" id="detailSubOrder">—</span></div>
           <div class="info-row"><span class="info-label">Packet ID</span><span class="info-val" id="detailPacketId">—</span></div>
+          <div class="info-row"><span class="info-label">Claim Type</span><span class="info-val" id="detailClaimType">—</span></div>
+          <div class="info-row"><span class="info-label">Packet State</span><span class="info-val" id="detailPacketState">—</span></div>
           <div class="info-row"><span class="info-label">Status</span><span class="info-val" id="detailStatus">—</span></div>
           <div class="info-row"><span class="info-label">Days Remaining</span><div id="detailDays"></div></div>
         </div>
@@ -1000,6 +1066,15 @@ let claimAwbVal      = null;
 let claimSubOrderVal = null;
 let claimScanIdVal   = null;
 let claimPacketId    = null;
+let claimTypeVal     = null;
+let packetStateVal   = null;
+
+const CLAIM_TYPE_LABELS = {
+  wrong_return:   'Wrong Return',
+  damaged_return: 'Damaged Return',
+  missing_items:  'Missing Items in Return',
+  used_product:   'Used Product as Return',
+};
 
 // For claim detail
 let detailClaim = null;
@@ -1196,7 +1271,7 @@ function connectWS() {
         if (msg.scanId) currentScanId = msg.scanId;
         // Update scan result modal
         $('modalSubOrder').textContent = msg.subOrderId || '(not found on Meesho)';
-        $('btnWrongItem').disabled = false;
+        $('btnWrongItem').disabled = !msg.subOrderId; // disabled if no sub order found
         $('btnOkScan').disabled    = false;
         // Update last scan card
         $('lastSubOrder').textContent = msg.subOrderId || '(not found)';
@@ -1661,15 +1736,18 @@ function sendScan(awb) {
   // Add to history
   addToHistory(awb, 'scanned');
 
-  // Enable buttons after 6s even if extension doesn't respond (it may be offline)
+  // Enable OK after 6s even if extension doesn't respond (it may be offline).
+  // Wrong Item stays disabled when no sub order ID was found.
   setTimeout(() => {
     if ($('scanResultModal').classList.contains('open') && $('modalAwb').textContent === awb) {
-      $('btnOkScan').disabled    = false;
-      $('btnWrongItem').disabled = false;
+      $('btnOkScan').disabled = false;
       if ($('modalSubOrder').textContent === 'Waiting for extension…') {
         $('modalSubOrder').textContent = '(extension did not respond)';
         $('lastSubOrder').textContent  = '(no response)';
+        // No sub order — keep Wrong Item disabled
       }
+      // Only enable Wrong Item if we actually received a sub order ID
+      if (currentSubOrder) $('btnWrongItem').disabled = false;
     }
   }, 6000);
 }
@@ -1707,10 +1785,16 @@ function openAddClaim() {
   claimSubOrderVal = currentSubOrder;
   claimScanIdVal = currentScanId;
   claimPacketId = null;
+  claimTypeVal  = null;
+  packetStateVal = null;
 
   // Prefill step 1
   $('claimAwb').value = claimAwbVal || '';
   $('claimSubOrder').value = claimSubOrderVal || '(not found)';
+
+  // Reset step 3 selections
+  document.querySelectorAll('.selection-btn').forEach(b => b.classList.remove('selected'));
+  $('step3NextBtn').disabled = true;
 
   goClaimStep1();
   navTo('addClaim');
@@ -1724,14 +1808,14 @@ function skipScanAndBack() {
 // ── Claim steps ───────────────────────────────────────────────────────────────
 
 function setStepActive(step) {
-  [1,2,3].forEach(i => {
+  [1,2,3,4].forEach(i => {
     const el = $(`step${i}`);
     const isActive = i === step;
     const isDone   = i < step;
     el.className = `step ${isActive ? 'active' : isDone ? 'done' : ''}`;
     $(`addStep${i}`).style.display = i === step ? 'block' : 'none';
   });
-  [1,2].forEach(i => {
+  [1,2,3].forEach(i => {
     $(`line${i}`).className = `step-line ${i < step ? 'done' : ''}`;
   });
 }
@@ -1744,11 +1828,36 @@ function goClaimStep2() {
 function goClaimStep3() {
   stopPacketCamera();
   claimPacketId = $('packetIdConfirm').value.trim() || null;
+  setStepActive(3);
+}
+function goClaimStep4() {
   $('confirmAwb').textContent = claimAwbVal || '—';
   $('confirmSubOrder').textContent = claimSubOrderVal || '(not found)';
   $('confirmPacketId').textContent = claimPacketId || '(not scanned)';
+  $('confirmClaimType').textContent = CLAIM_TYPE_LABELS[claimTypeVal] || '—';
+  $('confirmPacketState').textContent = packetStateVal === 'intact' ? '✅ Intact' : packetStateVal === 'tampered' ? '⚠️ Tampered' : '—';
   $('claimDaysBadge').innerHTML = daysBadge(Date.now());
-  setStepActive(3);
+  setStepActive(4);
+}
+
+function selectClaimType(type) {
+  claimTypeVal = type;
+  document.querySelectorAll('[data-type]').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.type === type);
+  });
+  checkStep3Ready();
+}
+
+function selectPacketState(state) {
+  packetStateVal = state;
+  document.querySelectorAll('[data-state]').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.state === state);
+  });
+  checkStep3Ready();
+}
+
+function checkStep3Ready() {
+  $('step3NextBtn').disabled = !(claimTypeVal && packetStateVal);
 }
 
 async function saveClaim() {
@@ -1765,6 +1874,8 @@ async function saveClaim() {
         subOrderNum: claimSubOrderVal || '',
         packetId: claimPacketId || '',
         scanId: claimScanIdVal || '',
+        claimType: claimTypeVal || 'wrong_return',
+        packetState: packetStateVal || 'intact',
       }),
     });
     const data = await res.json();
@@ -1833,6 +1944,8 @@ function openClaimDetail(claimId) {
   $('detailAwb').textContent = detailClaim.awb || '—';
   $('detailSubOrder').textContent = detailClaim.subOrderNum || '(not recorded)';
   $('detailPacketId').textContent = detailClaim.packetId || '(not scanned)';
+  $('detailClaimType').textContent = CLAIM_TYPE_LABELS[detailClaim.claimType] || detailClaim.claimType || '—';
+  $('detailPacketState').textContent = detailClaim.packetState === 'intact' ? '✅ Intact' : detailClaim.packetState === 'tampered' ? '⚠️ Tampered' : '—';
   $('detailStatus').textContent = detailClaim.status;
   $('detailDays').innerHTML = daysBadge(detailClaim.ts, detailClaim.claimWindowDays || 7);
 

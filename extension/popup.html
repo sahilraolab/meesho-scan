@@ -79,6 +79,36 @@
     </div>
     <button class="btn btn-ghost" id="clearClaimsBtn" style="display:none">Clear filled claims</button>
 
+    <div class="sep"></div>
+
+    <!-- Claim form URLs (one per issue type) -->
+    <div class="section-header">
+      <span class="section-title">Claim Form URLs</span>
+    </div>
+    <div class="claims-url-hint">Paste the direct Meesho claim form URL for each issue type. The extension will open it automatically when you click "Fill Form".</div>
+
+    <div class="claim-url-list">
+      <div class="claim-url-item">
+        <div class="claim-url-label">🔄 Wrong Return</div>
+        <input type="url" id="urlWrongReturn" placeholder="https://supplier.meesho.com/…" autocomplete="off" />
+      </div>
+      <div class="claim-url-item">
+        <div class="claim-url-label">💢 Damaged Return</div>
+        <input type="url" id="urlDamagedReturn" placeholder="https://supplier.meesho.com/…" autocomplete="off" />
+      </div>
+      <div class="claim-url-item">
+        <div class="claim-url-label">📦 Missing Items</div>
+        <input type="url" id="urlMissingItems" placeholder="https://supplier.meesho.com/…" autocomplete="off" />
+      </div>
+      <div class="claim-url-item">
+        <div class="claim-url-label">♻️ Used Product</div>
+        <input type="url" id="urlUsedProduct" placeholder="https://supplier.meesho.com/…" autocomplete="off" />
+      </div>
+    </div>
+
+    <button class="btn btn-secondary" id="saveClaimUrlsBtn" style="margin-top:4px">Save URLs</button>
+    <div id="claimUrlsStatus" class="claims-url-status"></div>
+
   </div>
 
 </div>

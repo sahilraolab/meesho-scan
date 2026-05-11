@@ -242,7 +242,7 @@ app.post('/api/claim', auth, assignClaimId, (req, res, next) => {
 // Create pending claim without media (wrong-item flow)
 app.post('/api/claim/wrong-item', auth, async (req, res) => {
   try {
-    const { awb, subOrderNum, packetId, scanId } = req.body || {};
+    const { awb, subOrderNum, packetId, scanId, claimType, packetState } = req.body || {};
     if (!awb) return res.status(400).json({ error: 'AWB is required.' });
 
     const claimId = crypto.randomUUID();
@@ -251,6 +251,8 @@ app.post('/api/claim/wrong-item', auth, async (req, res) => {
       subOrderNum: subOrderNum || '', packetId: packetId || '',
       scanId: scanId || null, files: {}, ts: Date.now(),
       status: 'pending', type: 'wrong_item', claimWindowDays: 7,
+      claimType: claimType || 'wrong_return',
+      packetState: packetState || 'intact',
     });
 
     if (scanId) {
@@ -260,7 +262,11 @@ app.post('/api/claim/wrong-item', auth, async (req, res) => {
     const conn = getConn(req.user.email);
     let delivered = false;
     if (conn.extension?.readyState === WebSocket.OPEN) {
-      conn.extension.send(JSON.stringify({ type: 'claim', claimId, subOrderNum, awb, packetId, files: {} }));
+      conn.extension.send(JSON.stringify({
+        type: 'claim', claimId, subOrderNum, awb, packetId, files: {},
+        claimType: claimType || 'wrong_return',
+        packetState: packetState || 'intact',
+      }));
       delivered = true;
     }
 
@@ -360,6 +366,8 @@ app.post('/api/claim/:claimId/relay', auth, async (req, res) => {
         subOrderNum: claim.subOrderNum,
         packetId: claim.packetId,
         files: claim.files,
+        claimType: claim.claimType || 'wrong_return',
+        packetState: claim.packetState || 'intact',
       }));
       delivered = true;
     }
