@@ -89,11 +89,30 @@ app.use(cors({
 }));
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'mobile')));
 
-app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'mobile', 'index.html')));
+// Serve static assets (JS/CSS/images) with cache, but HTML files always no-cache
+// so users get fresh content on a single normal refresh after deployments
+app.use(express.static(path.join(__dirname, 'mobile'), {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  },
+}));
+
+app.get('/', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, 'mobile', 'index.html'));
+});
 
 app.get('/dashboard', auth, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, 'dashboard.html'));
 });
 
@@ -242,15 +261,29 @@ app.post('/api/claim', auth, assignClaimId, (req, res, next) => {
 // Create pending claim without media (wrong-item flow)
 app.post('/api/claim/wrong-item', auth, async (req, res) => {
   try {
-    const { awb, subOrderNum, packetId, scanId, claimType, packetState } = req.body || {};
-    if (!awb) return res.status(400).json({ error: 'AWB is required.' });
+    const { awb, subOrderNum, packetId, scanId, claimType, packetState, deliveryDate } = req.body || {};
+    if (!awb)          return res.status(400).json({ error: 'AWB is required.' });
+    if (!subOrderNum)  return res.status(400).json({ error: 'Sub Order ID is required.' });
+    if (!claimType)    return res.status(400).json({ error: 'Claim Type is required.' });
+    if (!packetState)  return res.status(400).json({ error: 'Packet State is required.' });
+
+    // Compute claimWindowDays from actual delivery date if provided
+    let claimWindowDays = 7;
+    if (deliveryDate) {
+      const delivered = new Date(deliveryDate + 'T00:00:00');
+      const deadline  = new Date(delivered);
+      deadline.setDate(deadline.getDate() + 7);
+      claimWindowDays = Math.ceil((deadline - Date.now()) / 86400000);
+    }
 
     const claimId = crypto.randomUUID();
     await claims.insertAsync({
       email: req.user.email, claimId, awb,
       subOrderNum: subOrderNum || '', packetId: packetId || '',
       scanId: scanId || null, files: {}, ts: Date.now(),
-      status: 'pending', type: 'wrong_item', claimWindowDays: 7,
+      status: 'pending', type: 'wrong_item',
+      claimWindowDays,
+      deliveryDate: deliveryDate || null,
       claimType: claimType || 'wrong_return',
       packetState: packetState || 'intact',
     });
@@ -517,11 +550,11 @@ wss.on('connection', (ws) => {
 
     // ── Sub-order found (extension → mobile) ────────────────────────────────
     if (msg.type === 'suborder_found' && role === 'extension') {
-      const { awb, subOrderId, scanId } = msg;
-      console.log(`[SUBORDER] ${awb} → ${subOrderId || 'null'}`);
+      const { awb, subOrderId, deliveryDate, scanId } = msg;
+      console.log(`[SUBORDER] ${awb} → ${subOrderId || 'null'} delivery=${deliveryDate || 'null'}`);
       const conn = getConn(email);
       if (conn.mobile?.readyState === WebSocket.OPEN) {
-        conn.mobile.send(JSON.stringify({ type: 'suborder_found', awb, subOrderId, scanId }));
+        conn.mobile.send(JSON.stringify({ type: 'suborder_found', awb, subOrderId, deliveryDate, scanId }));
       }
     }
 

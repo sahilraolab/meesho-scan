@@ -721,6 +721,10 @@
             <span class="info-label">Status</span>
             <span class="info-val" id="lastStatus">—</span>
           </div>
+          <div class="info-row" id="lastDeadlineRow" style="display:none">
+            <span class="info-label">Claim Deadline</span>
+            <span class="info-val" id="lastDeadline" style="font-weight:600;">—</span>
+          </div>
         </div>
       </div>
 
@@ -998,6 +1002,10 @@
     <div class="modal-sub" id="scanModalSub">Extension is searching…</div>
     <div class="info-row"><span class="info-label">AWB</span><span class="info-val" id="modalAwb">—</span></div>
     <div class="info-row"><span class="info-label">Sub Order ID</span><span class="info-val" id="modalSubOrder">Waiting for extension…</span></div>
+    <div class="info-row" id="modalDeadlineRow" style="display:none">
+      <span class="info-label">Claim Deadline</span>
+      <span class="info-val" id="modalDeadline" style="font-weight:600;">—</span>
+    </div>
     <div class="modal-btns">
       <button class="btn btn-secondary" id="btnSkipScan" onclick="skipCurrentScan()">⏭ Skip</button>
       <button class="btn btn-danger" id="btnWrongItem" onclick="openAddClaim()" disabled>⚠️ Wrong Item</button>
@@ -1066,8 +1074,9 @@ let claimAwbVal      = null;
 let claimSubOrderVal = null;
 let claimScanIdVal   = null;
 let claimPacketId    = null;
-let claimTypeVal     = null;
-let packetStateVal   = null;
+let claimTypeVal        = null;
+let packetStateVal      = null;
+let currentDeliveryDate = null;
 
 const CLAIM_TYPE_LABELS = {
   wrong_return:   'Wrong Return',
@@ -1266,17 +1275,62 @@ function connectWS() {
         if (msg.scanId) currentScanId = msg.scanId;
         break;
 
-      case 'suborder_found':
-        currentSubOrder = msg.subOrderId || null;
+      case 'suborder_found': {
+        currentSubOrder        = msg.subOrderId || null;
+        currentDeliveryDate    = msg.deliveryDate || null;
         if (msg.scanId) currentScanId = msg.scanId;
+
+        // Calculate 7-day claim deadline from delivery date
+        let deadlineText   = null;
+        let deadlineColor  = null;
+        if (msg.deliveryDate) {
+          const delivered  = new Date(msg.deliveryDate + 'T00:00:00');
+          const deadline   = new Date(delivered);
+          deadline.setDate(deadline.getDate() + 7);
+          const today      = new Date();
+          today.setHours(0, 0, 0, 0);
+          const daysLeft   = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
+          const opts       = { day: 'numeric', month: 'short', year: 'numeric' };
+          const dlStr      = deadline.toLocaleDateString('en-IN', opts);
+          if (daysLeft < 0) {
+            deadlineText  = `${dlStr} (EXPIRED ${Math.abs(daysLeft)}d ago)`;
+            deadlineColor = '#dc2626'; // red
+          } else if (daysLeft === 0) {
+            deadlineText  = `${dlStr} (TODAY — last day!)`;
+            deadlineColor = '#dc2626';
+          } else if (daysLeft <= 2) {
+            deadlineText  = `${dlStr} (${daysLeft}d left — urgent!)`;
+            deadlineColor = '#d97706'; // amber
+          } else {
+            deadlineText  = `${dlStr} (${daysLeft}d left)`;
+            deadlineColor = '#16a34a'; // green
+          }
+        }
+
         // Update scan result modal
         $('modalSubOrder').textContent = msg.subOrderId || '(not found on Meesho)';
-        $('btnWrongItem').disabled = !msg.subOrderId; // disabled if no sub order found
+        if (deadlineText) {
+          $('modalDeadline').textContent     = deadlineText;
+          $('modalDeadline').style.color     = deadlineColor;
+          $('modalDeadlineRow').style.display = '';
+        } else {
+          $('modalDeadlineRow').style.display = 'none';
+        }
+        $('btnWrongItem').disabled = !msg.subOrderId;
         $('btnOkScan').disabled    = false;
+
         // Update last scan card
         $('lastSubOrder').textContent = msg.subOrderId || '(not found)';
         $('lastStatus').textContent   = 'Extension found order';
+        if (deadlineText) {
+          $('lastDeadline').textContent     = deadlineText;
+          $('lastDeadline').style.color     = deadlineColor;
+          $('lastDeadlineRow').style.display = '';
+        } else {
+          $('lastDeadlineRow').style.display = 'none';
+        }
         break;
+      }
 
       case 'scan_ok':
         dismissScanModal();
@@ -1836,7 +1890,25 @@ function goClaimStep4() {
   $('confirmPacketId').textContent = claimPacketId || '(not scanned)';
   $('confirmClaimType').textContent = CLAIM_TYPE_LABELS[claimTypeVal] || '—';
   $('confirmPacketState').textContent = packetStateVal === 'intact' ? '✅ Intact' : packetStateVal === 'tampered' ? '⚠️ Tampered' : '—';
-  $('claimDaysBadge').innerHTML = daysBadge(Date.now());
+  if (currentDeliveryDate) {
+    const delivered  = new Date(currentDeliveryDate + 'T00:00:00');
+    const deadline   = new Date(delivered);
+    deadline.setDate(deadline.getDate() + 7);
+    const today      = new Date(); today.setHours(0,0,0,0);
+    const dLeft      = Math.ceil((deadline - today) / 86400000);
+    const opts       = { day:'numeric', month:'short', year:'numeric' };
+    const dlStr      = deadline.toLocaleDateString('en-IN', opts);
+    const cls        = dLeft <= 0 ? 'urgent' : dLeft <= 2 ? 'warn' : 'ok';
+    const icon       = dLeft <= 0 ? '🔴' : dLeft <= 2 ? '🟡' : '🟢';
+    const label      = dLeft < 0  ? ('EXPIRED ' + Math.abs(dLeft) + 'd ago')
+                     : dLeft === 0 ? 'TODAY — last day!'
+                     : (dLeft + ' day' + (dLeft !== 1 ? 's' : '') + ' left');
+    $('claimDaysBadge').innerHTML =
+      '<span class="days-badge ' + cls + '">' + icon + ' ' + label + '</span>' +
+      '<span style="font-size:11px;color:var(--muted);display:block;margin-top:3px;">Deadline: ' + dlStr + '</span>';
+  } else {
+    $('claimDaysBadge').innerHTML = daysBadge(Date.now());
+  }
   setStepActive(4);
 }
 
@@ -1861,6 +1933,13 @@ function checkStep3Ready() {
 }
 
 async function saveClaim() {
+  const missing = [];
+  if (!claimAwbVal)                                          missing.push('AWB');
+  if (!claimSubOrderVal || claimSubOrderVal === '(not found)') missing.push('Sub Order ID');
+  if (!claimTypeVal)                                         missing.push('Claim Type');
+  if (!packetStateVal)                                       missing.push('Packet State');
+  if (missing.length) { toast('Missing required: ' + missing.join(', '), 'error'); return; }
+
   const btn = $('savClaimBtn');
   btn.disabled = true;
   btn.innerHTML = '<div class="spinner"></div> Saving…';
@@ -1874,8 +1953,9 @@ async function saveClaim() {
         subOrderNum: claimSubOrderVal || '',
         packetId: claimPacketId || '',
         scanId: claimScanIdVal || '',
-        claimType: claimTypeVal || 'wrong_return',
-        packetState: packetStateVal || 'intact',
+        claimType:    claimTypeVal || 'wrong_return',
+        packetState:  packetStateVal || 'intact',
+        deliveryDate: currentDeliveryDate || null,
       }),
     });
     const data = await res.json();

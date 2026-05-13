@@ -41,6 +41,17 @@
 
   // ── WebSocket ─────────────────────────────────────────────────────────────
 
+  // Safe send — silently drops if socket is not open (avoids crash when WS
+  // disconnects during the 3s wait after search)
+  function wsSend(payload) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(payload));
+      return true;
+    }
+    console.warn('[MeeshoScan] wsSend: socket not open, dropped:', payload.type);
+    return false;
+  }
+
   function wsUrl() {
     // Replace http(s) scheme with ws(s) — keep host, port, and path intact
     return serverUrl.replace(/^https?:\/\//, (m) => m === 'https://' ? 'wss://' : 'ws://');
@@ -63,7 +74,7 @@
     ws = wsInst;
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'auth', token, role: 'extension' }));
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'auth', token, role: 'extension' }));
     };
 
     ws.onmessage = (ev) => {
@@ -147,13 +158,13 @@
       // Wait for results
       await sleep(3000);
 
-      const subOrderId = extractSubOrderId();
+      const { subOrderId, deliveryDate } = extractSubOrderInfo();
       if (subOrderId) {
-        ws.send(JSON.stringify({ type: 'suborder_found', awb, subOrderId, scanId }));
+        wsSend({ type: 'suborder_found', awb, subOrderId, deliveryDate, scanId });
         showNotif(`✅ Sub order found: ${subOrderId}`);
       } else {
         // Still send back so mobile can enable the OK/Wrong Item buttons
-        ws.send(JSON.stringify({ type: 'suborder_found', awb, subOrderId: null, scanId }));
+        wsSend({ type: 'suborder_found', awb, subOrderId: null, deliveryDate: null, scanId });
         showNotif(`ℹ️ Searched: ${awb} — no sub order found`);
       }
     } catch (err) {
@@ -162,7 +173,10 @@
     }
   }
 
-  function extractSubOrderId() {
+  // Returns { subOrderId, deliveryDate } from the Meesho returns table.
+  // Table column order: Product(0) | Suborder(1) | Status(2) | Created(3) | Delivery(4) | Reason(5) | Action(6)
+  // deliveryDate is an ISO date string (YYYY-MM-DD) parsed from Meesho's "5 May'26" format.
+  function extractSubOrderInfo() {
     const selectors = [
       'table tbody tr',
       '.m_177_l5ohi10 tbody tr',
@@ -170,18 +184,91 @@
       '[role="table"] tr',
     ];
 
+    const MONTH_MAP = {
+      jan:0, feb:1, mar:2, apr:3, may:4, jun:5,
+      jul:6, aug:7, sep:8, oct:9, nov:10, dec:11,
+    };
+
+    function parseMeeshoDate(raw) {
+      // Handles "5 May'26", "12 Jan'25", "5 May 2026" etc.
+      const clean = raw.replace(/\s+/g, ' ').trim();
+      // Pattern: day MonAbbr'YY  e.g. "5 May'26"
+      let m = clean.match(/^(\d{1,2})\s+([A-Za-z]{3})'(\d{2})$/);
+      if (m) {
+        const day   = parseInt(m[1], 10);
+        const month = MONTH_MAP[m[2].toLowerCase()];
+        const year  = 2000 + parseInt(m[3], 10);
+        if (month !== undefined) {
+          const d = new Date(year, month, day);
+          return d.toISOString().split('T')[0]; // YYYY-MM-DD
+        }
+      }
+      // Pattern: day Month YYYY e.g. "5 May 2026"
+      m = clean.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+      if (m) {
+        const day   = parseInt(m[1], 10);
+        const month = MONTH_MAP[m[2].slice(0,3).toLowerCase()];
+        const year  = parseInt(m[3], 10);
+        if (month !== undefined) {
+          const d = new Date(year, month, day);
+          return d.toISOString().split('T')[0];
+        }
+      }
+      return null;
+    }
+
     for (const selector of selectors) {
       const rows = document.querySelectorAll(selector);
       for (const row of rows) {
         const cells = row.querySelectorAll('td');
         if (cells.length < 2) continue;
+
+        // Find subOrderId — look in first 3 cells for pattern digits_digits
+        let subOrderId = null;
         for (let i = 0; i < Math.min(cells.length, 3); i++) {
           const text = (cells[i].textContent || '').replace(/\s+/g, '').trim();
-          if (/^\d+_\d+$/.test(text)) return text;
+          if (/^\d+_\d+$/.test(text)) { subOrderId = text; break; }
         }
+        if (!subOrderId) continue;
+
+        // Extract delivery/delivered date from column index 4
+        // The cell contains text like "5 May'26" possibly followed by tooltip/icon text
+        let deliveryDate = null;
+        if (cells.length > 4) {
+          // The date is the first meaningful text node inside the cell
+          // Strip any nested SVG/tooltip text by reading only text nodes
+          const cell = cells[4];
+          // Try the vj3rjv1 date div first (Meesho's date wrapper class)
+          const dateDiv = cell.querySelector('.vj3rjv1, [class*="vj3rjv1"]');
+          const rawDate = dateDiv
+            ? (dateDiv.firstChild?.textContent || dateDiv.textContent || '').trim()
+            : '';
+          if (rawDate) deliveryDate = parseMeeshoDate(rawDate);
+
+          // Fallback: walk text nodes directly in the cell
+          if (!deliveryDate) {
+            const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+            let node;
+            while ((node = walker.nextNode())) {
+              const t = node.textContent.trim();
+              if (/\d{1,2}\s+[A-Za-z]/.test(t)) {
+                deliveryDate = parseMeeshoDate(t);
+                if (deliveryDate) break;
+              }
+            }
+          }
+        }
+
+        console.log(`[MeeshoScan] extracted subOrderId=${subOrderId} deliveryDate=${deliveryDate}`);
+        return { subOrderId, deliveryDate };
       }
     }
-    return null;
+    return { subOrderId: null, deliveryDate: null };
+  }
+
+  // Keep backward-compat alias
+  function extractSubOrderId() {
+    return extractSubOrderInfo().subOrderId;
   }
 
   // ── Claim received (from server WS) ───────────────────────────────────────
@@ -289,27 +376,53 @@
 
       if (base && tok) {
         const fileMap = [
-          { field: 'barcode_image',   selectors: ['input[id^="barcode_image_link"]', 'input[id*="barcode"]'] },
-          { field: 'product_image',   selectors: ['input[id^="product_image_link"]', 'input[id*="product_image"]'] },
-          { field: 'reverse_waybill', selectors: ['input[id^="product_reverse_way_bill_link"]', 'input[id*="reverse_way_bill"]', 'input[id*="waybill"]'] },
-          { field: 'unpacking_video', selectors: ['input[id^="product_openingvideo_link"]', 'input[id*="openingvideo"]', 'input[accept*="video"]'] },
+          { field: 'barcode_image',   selectors: ['input[id^="barcode_image_link"]', 'input[id*="barcode"]'], wait: 8000 },
+          { field: 'product_image',   selectors: ['input[id^="product_image_link"]', 'input[id*="product_image"]'], wait: 8000 },
+          { field: 'reverse_waybill', selectors: ['input[id^="product_reverse_way_bill_link"]', 'input[id*="reverse_way_bill"]', 'input[id*="waybill"]'], wait: 8000 },
+          // Video input: longer wait (12s) + scroll into view + retry
+          // NEVER use input[accept*="video"] — too broad, matches unrelated inputs
+          { field: 'unpacking_video', selectors: ['input[id^="product_openingvideo_link"]', 'input[id*="openingvideo"]', 'input[id*="opening_video"]', 'input[id*="unpackingvideo"]'], wait: 12000 },
         ];
 
-        for (const { field, selectors: sels } of fileMap) {
+        for (const { field, selectors: sels, wait: waitMs } of fileMap) {
           if (!files?.[field]) continue;
           showNotif(`📎 Uploading ${field.replace(/_/g, ' ')}…`);
 
+          // Find the input — try each selector, first gets full wait budget, rest get 2s
           let inp = null;
-          for (const sel of sels) {
-            inp = await waitForElement(sel, sel === sels[0] ? 8000 : 1500);
-            if (inp) break;
+          for (let si = 0; si < sels.length; si++) {
+            inp = await waitForElement(sels[si], si === 0 ? waitMs : 2000);
+            if (inp) { console.log(`[MeeshoScan] ${field} found via: ${sels[si]}`); break; }
           }
-          if (!inp) { showNotif(`⚠️ Input not found: ${field}`, true); continue; }
 
-          const ok = await injectFile(inp, `${base}/api/claim/${claimId}/${field}`, tok, field);
+          if (!inp) {
+            showNotif(`⚠️ Input not found: ${field}`, true);
+            console.warn(`[MeeshoScan] no input found for ${field}, tried:`, sels);
+            continue;
+          }
+
+          // Scroll input into view so React renders it fully before injection
+          inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          await sleep(field === 'unpacking_video' ? 800 : 300);
+
+          // Fetch the file ONCE from the server, then retry only the DOM injection
+          // (never re-fetch — that caused the video to be uploaded multiple times)
+          let file;
+          try {
+            file = await fetchFileViaBackground(`${base}/api/claim/${claimId}/${field}`, tok);
+          } catch (fetchErr) {
+            showNotif(`❌ Fetch failed: ${field}: ${fetchErr.message}`, true);
+            continue;
+          }
+
+          // Single injection attempt — no retry loop.
+          // React accepts the file internally but doesn't always reflect it back on
+          // input.files, so a retry loop just injects the same file multiple times.
+          const ok = await injectFileFromBlob(inp, file, field);
+
           if (ok) showNotif(`✅ ${field.replace(/_/g, ' ')} uploaded`);
           else    showNotif(`⚠️ ${field.replace(/_/g, ' ')} may not have uploaded — check form`, true);
-          await sleep(1000);
+          await sleep(field === 'unpacking_video' ? 1500 : 1000);
         }
       }
 
@@ -342,23 +455,33 @@
     return new File([blob], `${url.split('/').pop()}.${ext}`, { type: mime });
   }
 
-  async function injectFile(input, url, tok, field) {
+  // Inject an already-fetched File object into a React input — no network call
+  async function injectFileFromBlob(input, file, field) {
     try {
-      const file = await fetchFileViaBackground(url, tok);
-      const dt   = new DataTransfer();
+      const dt = new DataTransfer();
       dt.items.add(file);
 
       const origClick = HTMLInputElement.prototype.click;
-      HTMLInputElement.prototype.click = function () {
-        if (this === input) return;
-        origClick.call(this);
-      };
+      HTMLInputElement.prototype.click = function () { if (this === input) return; origClick.call(this); };
 
       await triggerReactFileChange(input, dt.files);
 
       HTMLInputElement.prototype.click = origClick;
-      await sleep(300);
+
+      // Give React time to process the synthetic event before checking
+      await sleep(field === 'unpacking_video' ? 600 : 300);
       return input.files && input.files.length > 0;
+    } catch (err) {
+      showNotif(`❌ Inject error: ${field}: ${err.message}`, true);
+      return false;
+    }
+  }
+
+  // Convenience wrapper: fetch + inject in one call (used outside the fileMap loop)
+  async function injectFile(input, url, tok, field) {
+    try {
+      const file = await fetchFileViaBackground(url, tok);
+      return await injectFileFromBlob(input, file, field);
     } catch (err) {
       showNotif(`❌ Upload error: ${field}: ${err.message}`, true);
       return false;
